@@ -1,645 +1,645 @@
-# AgentGuard v3 Lab Execution Index
+# AgentGuard v4 Lab Execution Index
 
 This is the reviewed, authoritative map between the manual, the starter-kit files, and the exact Claude Code prompt for every lab.
 
 > Use the manual for teaching and click-by-click guidance. Use the matching prompt file for Claude Code. The file and command list below has been validated against this starter kit.
 
-## Day 1 · Lab 1 · Understand The V3 Problem And Finish Line
-- Estimated time: 50 minutes
-- Learning purpose: why direct file access does not represent enterprise integrations and why a protocol boundary matters
+## Day 1 · Lab 1 · Understand The V4 Problem And Finish Line
+- Estimated time: 55 minutes
+- Learning purpose: why finding risk is not enough and why autonomous remediation is dangerous
 - Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day01_lab01_understand-the-v3-problem-and-finish-line.txt`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day01_lab01_understand-the-v4-problem-and-finish-line.txt`
 - Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 1 · Lab 2 · Copy The Released V2 Project Into A New V3 Folder
+## Day 1 · Lab 2 · Copy The Released V3 Project Into A New V4 Folder
 - Estimated time: 35 minutes
-- Learning purpose: how to preserve the grounded analyst while creating a new integration release
+- Learning purpose: how to preserve the read-only integration as the trusted discovery baseline
 - Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`
-- Commands: `cd ~/Developer` ; `cp -R agentguard-v2 agentguard-v3` ; `cd agentguard-v3` ; `pwd`
-- Prompt: `prompts/course_labs/day01_lab02_copy-the-released-v2-project-into-a-new-v3-folder.txt`
+- Commands: `cd ~/Developer` ; `cp -R agentguard-v3 agentguard-v4` ; `cd agentguard-v4` ; `pwd`
+- Prompt: `prompts/course_labs/day01_lab02_copy-the-released-v3-project-into-a-new-v4-folder.txt`
 - Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 1 · Lab 3 · Open The V3 Project In All Working Tools
+## Day 1 · Lab 3 · Open The Project In All Working Tools
 - Estimated time: 40 minutes
-- Learning purpose: how Terminal, Cursor, Claude Code, GitHub Desktop, and Chrome divide responsibilities
+- Learning purpose: how code, Terminal, browser, GitHub, and Docker will be used
 - Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day01_lab03_open-the-v3-project-in-all-working-tools.txt`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day01_lab03_open-the-project-in-all-working-tools.txt`
 - Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 1 · Lab 4 · Create A V3 Branch And Baseline Commit
+## Day 1 · Lab 4 · Create The V4 Branch And Baseline Commit
 - Estimated time: 40 minutes
-- Learning purpose: how a version boundary supports rollback and comparison
+- Learning purpose: how to isolate action-layer changes
 - Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day01_lab04_create-a-v3-branch-and-baseline-commit.txt`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day01_lab04_create-the-v4-branch-and-baseline-commit.txt`
 - Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 1 · Lab 5 · Run All V1 And V2 Regression Gates
-- Estimated time: 50 minutes
-- Learning purpose: how to prove the new integration work starts from a known-good product
-- Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`, `scanner.py`, `tests/test_scanner.py`, `scripts/run_release_gate.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python scripts/run_release_gate.py`
-- Prompt: `prompts/course_labs/day01_lab05_run-all-v1-and-v2-regression-gates.txt`
+## Day 1 · Lab 5 · Run All V1 V3 Release Gates
+- Estimated time: 55 minutes
+- Learning purpose: how to prove remediation starts from a stable discovery and analysis platform
+- Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`, `scripts/run_release_gate.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python scripts/run_release_gate.py`
+- Prompt: `prompts/course_labs/day01_lab05_run-all-v1-v3-release-gates.txt`
+- Done when: The terminal ends with RELEASE GATE PASS for AgentGuard v4. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 1 · Lab 6 · Learn Proposal Diff Hash Approval Verification Pr And Rollba
+- Estimated time: 90 minutes
+- Learning purpose: the concepts required for safe agentic action
+- Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`, `approval.py`, `proposal_hash.py`, `tests/test_approval.py`, `tests/test_proposal_hash.py`, `verifier.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_approval.py tests/test_proposal_hash.py tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day01_lab06_learn-proposal-diff-hash-approval-verification-pr-and-rollba.txt`
 - Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 1 · Lab 6 · Learn Mcp Host Client Server Tool Resource Transport And Sch
-- Estimated time: 90 minutes
-- Learning purpose: the protocol vocabulary needed to explain MCP clearly
-- Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day01_lab06_learn-mcp-host-client-server-tool-resource-transport-and-sch.txt`
-- Done when: The current MCP 2.x contract is used; the tool set remains exactly five read-only tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+## Day 1 · Lab 7 · Draw The V4 State Machine And Trust Boundaries
+- Estimated time: 70 minutes
+- Learning purpose: how data and authority change at each state
+- Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`, `docs/v4_architecture.md`, `workflow.py`, `tests/test_workflow.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_workflow.py`
+- Prompt: `prompts/course_labs/day01_lab07_draw-the-v4-state-machine-and-trust-boundaries.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 1 · Lab 7 · Draw The V3 Trust Boundaries And Data Flow
-- Estimated time: 60 minutes
-- Learning purpose: where untrusted connected data enters and where validation occurs
-- Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`, `docs/v3_architecture.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day01_lab07_draw-the-v3-trust-boundaries-and-data-flow.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 1 · Lab 8 · Create The Day 1 Evidence And Learning Log
+## Day 1 · Lab 8 · Create Day 1 Evidence And A No Production Pledge
 - Estimated time: 35 minutes
-- Learning purpose: how to capture architectural learning before writing server code
+- Learning purpose: how to document that the MVP uses only synthetic repositories and draft changes
 - Files: `notes/learning_log.md`, `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, `docs/roadmap.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day01_lab08_create-the-day-1-evidence-and-learning-log.txt`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day01_lab08_create-day-1-evidence-and-a-no-production-pledge.txt`
 - Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 2 · Lab 1 · Understand Why V3 Needs Both Python And Node Js Tools
-- Estimated time: 50 minutes
-- Learning purpose: why the server can be Python while the Inspector is launched with npx
-- Files: `notes/learning_log.md`, `requirements.txt`, `scripts/verify_setup.py`, `docs/v3_mcp_setup.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day02_lab01_understand-why-v3-needs-both-python-and-node-js-tools.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 2 · Lab 2 · Check Existing Node Js And Npm Versions
-- Estimated time: 30 minutes
-- Learning purpose: how version commands confirm whether the Inspector prerequisites exist
-- Files: `notes/learning_log.md`, `requirements.txt`, `scripts/verify_setup.py`, `docs/v3_mcp_setup.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day02_lab02_check-existing-node-js-and-npm-versions.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 2 · Lab 3 · Install Or Update Node Js With Homebrew
-- Estimated time: 45 minutes
-- Learning purpose: how Homebrew adds the Node runtime and npm package tool
-- Files: `notes/learning_log.md`, `requirements.txt`, `scripts/verify_setup.py`, `docs/v3_mcp_setup.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day02_lab03_install-or-update-node-js-with-homebrew.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 2 · Lab 4 · Install The V3 Python Requirements In Venv
-- Estimated time: 50 minutes
-- Learning purpose: how the official MCP Python SDK becomes available only inside this project
-- Files: `notes/learning_log.md`, `requirements.txt`, `scripts/verify_setup.py`, `docs/v3_mcp_setup.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pip install --upgrade pip` ; `python -m pip install -r requirements.txt`
-- Prompt: `prompts/course_labs/day02_lab04_install-the-v3-python-requirements-in-venv.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 2 · Lab 5 · Verify The Mcp Package And Mcpserver Import
-- Estimated time: 40 minutes
-- Learning purpose: how a tiny import check catches environment mistakes early
-- Files: `notes/learning_log.md`, `requirements.txt`, `scripts/verify_setup.py`, `docs/v3_mcp_setup.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day02_lab05_verify-the-mcp-package-and-fastmcp-import.txt`
-- Done when: The current MCP 2.x contract is used; the tool set remains exactly five read-only tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 2 · Lab 6 · Launch Mcp Inspector Help With Npx
-- Estimated time: 40 minutes
-- Learning purpose: how npx downloads and runs a temporary developer tool
-- Files: `notes/learning_log.md`, `requirements.txt`, `scripts/verify_setup.py`, `docs/v3_mcp_setup.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `npx @modelcontextprotocol/inspector --help`
-- Prompt: `prompts/course_labs/day02_lab06_launch-mcp-inspector-help-with-npx.txt`
-- Done when: MCP Inspector starts locally and can list the five read-only AgentGuard discovery tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 2 · Lab 7 · Review Stdio Transport And Logging Rules
-- Estimated time: 60 minutes
-- Learning purpose: why stdout carries protocol messages and logs must go to stderr
-- Files: `notes/learning_log.md`, `requirements.txt`, `scripts/verify_setup.py`, `docs/v3_mcp_setup.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python scripts/run_mcp_live_smoke.py`
-- Prompt: `prompts/course_labs/day02_lab07_review-stdio-transport-and-logging-rules.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 2 · Lab 8 · Run The V3 Setup Verifier And Save Evidence
-- Estimated time: 35 minutes
-- Learning purpose: how to confirm all runtimes before building the server
-- Files: `notes/learning_log.md`, `requirements.txt`, `scripts/verify_setup.py`, `docs/v3_mcp_setup.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python scripts/verify_setup.py` ; `python scripts/check_no_secrets.py`
-- Prompt: `prompts/course_labs/day02_lab08_run-the-v3-setup-verifier-and-save-evidence.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 3 · Lab 1 · Define The Connected System Problem And Data Contract
-- Estimated time: 55 minutes
-- Learning purpose: what an enterprise registry must provide to AgentGuard
-- Files: `notes/learning_log.md`, `connected_environment/agents.json`, `connected_environment/tool_catalog.json`, `connected_environment/ownership.json`, `connected_environment/untrusted_notes.txt`, `docs/v3_data_contract.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day03_lab01_define-the-connected-system-problem-and-data-contract.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 3 · Lab 2 · Create Connected Environment Agents Json
-- Estimated time: 60 minutes
-- Learning purpose: how the synthetic registry replaces v2 direct sample input
-- Files: `notes/learning_log.md`, `connected_environment/agents.json`, `connected_environment/tool_catalog.json`, `connected_environment/ownership.json`, `connected_environment/untrusted_notes.txt`, `docs/v3_data_contract.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m json.tool connected_environment/agents.json > /dev/null` ; `python -m json.tool connected_environment/tool_catalog.json > /dev/null` ; `python -m json.tool connected_environment/ownership.json > /dev/null`
-- Prompt: `prompts/course_labs/day03_lab02_create-connected-environment-agents-json.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 3 · Lab 3 · Create The Tool Catalog And Access Classifications
-- Estimated time: 55 minutes
-- Learning purpose: how tool metadata adds context beyond names
-- Files: `notes/learning_log.md`, `connected_environment/agents.json`, `connected_environment/tool_catalog.json`, `connected_environment/ownership.json`, `connected_environment/untrusted_notes.txt`, `docs/v3_data_contract.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day03_lab03_create-the-tool-catalog-and-access-classifications.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 3 · Lab 4 · Create The Ownership Source
-- Estimated time: 45 minutes
-- Learning purpose: how separate systems can provide complementary agent context
-- Files: `notes/learning_log.md`, `connected_environment/agents.json`, `connected_environment/tool_catalog.json`, `connected_environment/ownership.json`, `connected_environment/untrusted_notes.txt`, `docs/v3_data_contract.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day03_lab04_create-the-ownership-source.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 3 · Lab 5 · Create An Intentionally Malicious Untrusted Note
-- Estimated time: 45 minutes
-- Learning purpose: how connected content can contain prompt injection even when the transport is trusted
-- Files: `notes/learning_log.md`, `connected_environment/agents.json`, `connected_environment/tool_catalog.json`, `connected_environment/ownership.json`, `connected_environment/untrusted_notes.txt`, `docs/v3_data_contract.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day03_lab05_create-an-intentionally-malicious-untrusted-note.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 3 · Lab 6 · Validate Every Json File Manually And With Python
-- Estimated time: 55 minutes
-- Learning purpose: how syntax validation prevents server failures
-- Files: `notes/learning_log.md`, `connected_environment/agents.json`, `connected_environment/tool_catalog.json`, `connected_environment/ownership.json`, `connected_environment/untrusted_notes.txt`, `docs/v3_data_contract.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m json.tool connected_environment/agents.json > /dev/null` ; `python -m json.tool connected_environment/tool_catalog.json > /dev/null` ; `python -m json.tool connected_environment/ownership.json > /dev/null`
-- Prompt: `prompts/course_labs/day03_lab06_validate-every-json-file-manually-and-with-python.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 3 · Lab 7 · Document Required Fields And Maximum Sizes
-- Estimated time: 60 minutes
-- Learning purpose: how schemas constrain the attack surface
-- Files: `notes/learning_log.md`, `connected_environment/agents.json`, `connected_environment/tool_catalog.json`, `connected_environment/ownership.json`, `connected_environment/untrusted_notes.txt`, `docs/v3_data_contract.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day03_lab07_document-required-fields-and-maximum-sizes.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 3 · Lab 8 · Create Before State Evidence For The Connected Environment
-- Estimated time: 40 minutes
-- Learning purpose: how to show the inventory before AgentGuard discovery
-- Files: `notes/learning_log.md`, `connected_environment/agents.json`, `connected_environment/tool_catalog.json`, `connected_environment/ownership.json`, `connected_environment/untrusted_notes.txt`, `docs/v3_data_contract.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day03_lab08_create-before-state-evidence-for-the-connected-environment.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 4 · Lab 1 · Separate Pure Discovery Functions From Mcp Transport Code
-- Estimated time: 55 minutes
-- Learning purpose: why testable business logic should not depend on a running protocol server
-- Files: `notes/learning_log.md`, `discovery_core.py`, `mcp_security.py`, `tests/test_discovery_core.py`, `tests/test_mcp_security.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_core.py tests/test_mcp_security.py`
-- Prompt: `prompts/course_labs/day04_lab01_separate-pure-discovery-functions-from-mcp-transport-code.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 4 · Lab 2 · Create The Fixed Connected Environment File Allowlist
-- Estimated time: 45 minutes
-- Learning purpose: how the server refuses files the client was never authorized to select
-- Files: `notes/learning_log.md`, `discovery_core.py`, `mcp_security.py`, `tests/test_discovery_core.py`, `tests/test_mcp_security.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_core.py tests/test_mcp_security.py`
-- Prompt: `prompts/course_labs/day04_lab02_create-the-fixed-connected-environment-file-allowlist.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 4 · Lab 3 · Implement Safe Path Resolution
-- Estimated time: 80 minutes
-- Learning purpose: how resolve, parent checks, and fixed names block traversal
-- Files: `notes/learning_log.md`, `discovery_core.py`, `mcp_security.py`, `tests/test_discovery_core.py`, `tests/test_mcp_security.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_core.py tests/test_mcp_security.py`
-- Prompt: `prompts/course_labs/day04_lab03_implement-safe-path-resolution.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 4 · Lab 4 · Block Symbolic Link Escape And Unexpected File Types
+## Day 2 · Lab 1 · Understand Github Repository Branch Commit Push Pull Request
 - Estimated time: 70 minutes
-- Learning purpose: how filesystem indirection can bypass naive path checks
-- Files: `notes/learning_log.md`, `discovery_core.py`, `mcp_security.py`, `tests/test_discovery_core.py`, `tests/test_mcp_security.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_core.py tests/test_mcp_security.py`
-- Prompt: `prompts/course_labs/day04_lab04_block-symbolic-link-escape-and-unexpected-file-types.txt`
+- Learning purpose: how source-control review separates a proposal from an applied production change
+- Files: `notes/learning_log.md`, `docs/v4_github_demo_setup.md`, `.gitignore`, `CLAUDE.md`, `github_plan.py`, `tests/test_github_plan.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day02_lab01_understand-github-repository-branch-commit-push-pull-request.txt`
 - Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 4 · Lab 5 · Read Json With Sha 256 Provenance
-- Estimated time: 60 minutes
-- Learning purpose: how source hashes prove which connected inventory was scanned
-- Files: `notes/learning_log.md`, `discovery_core.py`, `mcp_security.py`, `tests/test_discovery_core.py`, `tests/test_mcp_security.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_core.py tests/test_mcp_security.py`
-- Prompt: `prompts/course_labs/day04_lab05_read-json-with-sha-256-provenance.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+## Day 2 · Lab 2 · Install And Verify Github Cli
+- Estimated time: 40 minutes
+- Learning purpose: how `gh` provides controlled command-line access to GitHub
+- Files: `notes/learning_log.md`, `docs/v4_github_demo_setup.md`, `.gitignore`, `CLAUDE.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `brew install gh` ; `gh --version`
+- Prompt: `prompts/course_labs/day02_lab02_install-and-verify-github-cli.txt`
+- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 4 · Lab 6 · Add Correlation Ids To Discovery Responses
+## Day 2 · Lab 3 · Authenticate Github Cli Through The Browser
 - Estimated time: 45 minutes
-- Learning purpose: how one request can be traced across server, adapter, scanner, and logs
-- Files: `notes/learning_log.md`, `discovery_core.py`, `mcp_security.py`, `tests/test_discovery_core.py`, `tests/test_mcp_security.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_core.py tests/test_mcp_security.py`
-- Prompt: `prompts/course_labs/day04_lab06_add-correlation-ids-to-discovery-responses.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+- Learning purpose: how OAuth login avoids placing a token in project files
+- Files: `notes/learning_log.md`, `docs/v4_github_demo_setup.md`, `.gitignore`, `CLAUDE.md`, `app_v4.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `gh auth login` ; `gh auth status`
+- Prompt: `prompts/course_labs/day02_lab03_authenticate-github-cli-through-the-browser.txt`
+- Done when: The AgentGuard v4 page opens locally and the new control or result is visible. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 4 · Lab 7 · Implement List Get Catalog Ownership And Health Functions
-- Estimated time: 85 minutes
-- Learning purpose: how five narrow operations provide enough v3 value without write access
-- Files: `notes/learning_log.md`, `discovery_core.py`, `mcp_security.py`, `tests/test_discovery_core.py`, `tests/test_mcp_security.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_core.py tests/test_mcp_security.py`
-- Prompt: `prompts/course_labs/day04_lab07_implement-list-get-catalog-ownership-and-health-functions.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 4 · Lab 8 · Write Pure Core And Path Safety Tests
-- Estimated time: 75 minutes
-- Learning purpose: how negative tests prove forbidden access is rejected
-- Files: `notes/learning_log.md`, `discovery_core.py`, `mcp_security.py`, `tests/test_discovery_core.py`, `tests/test_mcp_security.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_core.py tests/test_mcp_security.py`
-- Prompt: `prompts/course_labs/day04_lab08_write-pure-core-and-path-safety-tests.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 5 · Lab 1 · Create The Mcpserver Server Skeleton
-- Estimated time: 60 minutes
-- Learning purpose: how the SDK turns Python functions into protocol tools
-- Files: `notes/learning_log.md`, `mcp_server.py`, `tests/test_mcp_sdk_contract.py`, `tests/test_discovery_core.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_sdk_contract.py tests/test_discovery_core.py`
-- Prompt: `prompts/course_labs/day05_lab01_create-the-fastmcp-server-skeleton.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 5 · Lab 2 · Expose The Health Check Tool
-- Estimated time: 45 minutes
-- Learning purpose: how a minimal tool validates transport before business data
-- Files: `notes/learning_log.md`, `mcp_server.py`, `tests/test_mcp_sdk_contract.py`, `tests/test_discovery_core.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_sdk_contract.py tests/test_discovery_core.py`
-- Prompt: `prompts/course_labs/day05_lab02_expose-the-health-check-tool.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 5 · Lab 3 · Expose List Agent Inventory
-- Estimated time: 60 minutes
-- Learning purpose: how AgentGuard receives the full synthetic inventory
-- Files: `notes/learning_log.md`, `mcp_server.py`, `tests/test_mcp_sdk_contract.py`, `tests/test_discovery_core.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_sdk_contract.py tests/test_discovery_core.py`
-- Prompt: `prompts/course_labs/day05_lab03_expose-list-agent-inventory.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 5 · Lab 4 · Expose Get Agent By Name With Input Validation
-- Estimated time: 60 minutes
-- Learning purpose: how narrow lookup inputs reduce ambiguity and abuse
-- Files: `notes/learning_log.md`, `mcp_server.py`, `tests/test_mcp_sdk_contract.py`, `tests/test_discovery_core.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_sdk_contract.py tests/test_discovery_core.py`
-- Prompt: `prompts/course_labs/day05_lab04_expose-get-agent-by-name-with-input-validation.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 5 · Lab 5 · Expose Tool Catalog And Ownership Tools
-- Estimated time: 60 minutes
-- Learning purpose: how separate sources remain separately auditable
-- Files: `notes/learning_log.md`, `mcp_server.py`, `tests/test_mcp_sdk_contract.py`, `tests/test_discovery_core.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_sdk_contract.py tests/test_discovery_core.py`
-- Prompt: `prompts/course_labs/day05_lab05_expose-tool-catalog-and-ownership-tools.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 5 · Lab 6 · Configure Logging To Stderr Only
-- Estimated time: 45 minutes
-- Learning purpose: how to avoid corrupting STDIO JSON-RPC messages
-- Files: `notes/learning_log.md`, `mcp_server.py`, `tests/test_mcp_sdk_contract.py`, `tests/test_discovery_core.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_sdk_contract.py tests/test_discovery_core.py`
-- Prompt: `prompts/course_labs/day05_lab06_configure-logging-to-stderr-only.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 5 · Lab 7 · Inspect The Server Tool List In Source Code
-- Estimated time: 45 minutes
-- Learning purpose: how to prove there are exactly five tools and no write operation
-- Files: `notes/learning_log.md`, `mcp_server.py`, `tests/test_mcp_sdk_contract.py`, `tests/test_discovery_core.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_sdk_contract.py tests/test_discovery_core.py`
-- Prompt: `prompts/course_labs/day05_lab07_inspect-the-server-tool-list-in-source-code.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 5 · Lab 8 · Run Server Level Static And Automated Checks
-- Estimated time: 60 minutes
-- Learning purpose: how imports, tests, and schemas establish a stable server before client work
-- Files: `notes/learning_log.md`, `mcp_server.py`, `tests/test_mcp_sdk_contract.py`, `tests/test_discovery_core.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_sdk_contract.py tests/test_discovery_core.py`
-- Prompt: `prompts/course_labs/day05_lab08_run-server-level-static-and-automated-checks.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 6 · Lab 1 · Launch Mcp Inspector Against The Local Server
-- Estimated time: 50 minutes
-- Learning purpose: how an interactive protocol debugger exposes tools and responses
-- Files: `notes/learning_log.md`, `mcp_client.py`, `mcp_server.py`, `scripts/run_mcp_live_smoke.py`, `docs/v3_inspector_walkthrough.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `npx @modelcontextprotocol/inspector --help`
-- Prompt: `prompts/course_labs/day06_lab01_launch-mcp-inspector-against-the-local-server.txt`
-- Done when: MCP Inspector starts locally and can list the five read-only AgentGuard discovery tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 6 · Lab 2 · Call Health Check In Inspector
-- Estimated time: 35 minutes
-- Learning purpose: how to confirm transport initialization and read-only mode
-- Files: `notes/learning_log.md`, `mcp_client.py`, `mcp_server.py`, `scripts/run_mcp_live_smoke.py`, `docs/v3_inspector_walkthrough.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `npx @modelcontextprotocol/inspector --help`
-- Prompt: `prompts/course_labs/day06_lab02_call-health-check-in-inspector.txt`
-- Done when: MCP Inspector starts locally and can list the five read-only AgentGuard discovery tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 6 · Lab 3 · Call Every Discovery Tool In Inspector
-- Estimated time: 75 minutes
-- Learning purpose: how to validate inputs, outputs, and provenance without AgentGuard
-- Files: `notes/learning_log.md`, `mcp_client.py`, `mcp_server.py`, `scripts/run_mcp_live_smoke.py`, `docs/v3_inspector_walkthrough.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `npx @modelcontextprotocol/inspector --help`
-- Prompt: `prompts/course_labs/day06_lab03_call-every-discovery-tool-in-inspector.txt`
-- Done when: MCP Inspector starts locally and can list the five read-only AgentGuard discovery tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 6 · Lab 4 · Try Invalid Tool Inputs In Inspector
+## Day 2 · Lab 4 · Create A Separate Private Remediation Demo Repository
 - Estimated time: 55 minutes
-- Learning purpose: how errors should be clear and safe rather than leaking internals
-- Files: `notes/learning_log.md`, `mcp_client.py`, `mcp_server.py`, `scripts/run_mcp_live_smoke.py`, `docs/v3_inspector_walkthrough.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `npx @modelcontextprotocol/inspector --help`
-- Prompt: `prompts/course_labs/day06_lab04_try-invalid-tool-inputs-in-inspector.txt`
-- Done when: MCP Inspector starts locally and can list the five read-only AgentGuard discovery tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+- Learning purpose: why the training workflow must never target the AgentGuard source repository or production code
+- Files: `notes/learning_log.md`, `docs/v4_github_demo_setup.md`, `.gitignore`, `CLAUDE.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day02_lab04_create-a-separate-private-remediation-demo-repository.txt`
+- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 6 · Lab 5 · Build The Independent Stdio Mcp Client
+## Day 2 · Lab 5 · Clone The Demo Repository And Add Synthetic Agent Data
+- Estimated time: 60 minutes
+- Learning purpose: how a safe target repository represents a configuration change
+- Files: `notes/learning_log.md`, `docs/v4_github_demo_setup.md`, `.gitignore`, `CLAUDE.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day02_lab05_clone-the-demo-repository-and-add-synthetic-agent-data.txt`
+- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 2 · Lab 6 · Add A Pull Request Template And Branch Naming Rule
+- Estimated time: 55 minutes
+- Learning purpose: how review metadata standardizes proposed changes
+- Files: `notes/learning_log.md`, `docs/v4_github_demo_setup.md`, `.gitignore`, `CLAUDE.md`, `github_plan.py`, `tests/test_github_plan.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day02_lab06_add-a-pull-request-template-and-branch-naming-rule.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 2 · Lab 7 · Practice A Manual Draft Pull Request And Close It
+- Estimated time: 75 minutes
+- Learning purpose: how to understand the human workflow before AgentGuard automates it
+- Files: `notes/learning_log.md`, `docs/v4_github_demo_setup.md`, `.gitignore`, `CLAUDE.md`, `github_plan.py`, `tests/test_github_plan.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day02_lab07_practice-a-manual-draft-pull-request-and-close-it.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 2 · Lab 8 · Record Repository Allowlist Values Without Secrets
+- Estimated time: 40 minutes
+- Learning purpose: how owner/repo, file path, and branch prefix become configuration
+- Files: `notes/learning_log.md`, `docs/v4_github_demo_setup.md`, `.gitignore`, `CLAUDE.md`, `scripts/check_no_secrets.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python scripts/check_no_secrets.py`
+- Prompt: `prompts/course_labs/day02_lab08_record-repository-allowlist-values-without-secrets.txt`
+- Done when: The secret scanner prints SECRET CHECK PASS and no API key is committed. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 3 · Lab 1 · Understand Why Arbitrary Ai Generated Patches Are Excluded
+- Estimated time: 60 minutes
+- Learning purpose: how unconstrained code generation creates an unacceptable action surface
+- Files: `notes/learning_log.md`, `remediation_templates.py`, `tests/test_remediation_templates.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_remediation_templates.py`
+- Prompt: `prompts/course_labs/day03_lab01_understand-why-arbitrary-ai-generated-patches-are-excluded.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 3 · Lab 2 · Define The Three Allowlisted Remediation Templates
+- Estimated time: 55 minutes
+- Learning purpose: how human approval, owner assignment, and broad-tool removal address v1 findings
+- Files: `notes/learning_log.md`, `remediation_templates.py`, `tests/test_remediation_templates.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_remediation_templates.py`
+- Prompt: `prompts/course_labs/day03_lab02_define-the-three-allowlisted-remediation-templates.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 3 · Lab 3 · Create The Remediationproposal Data Contract
+- Estimated time: 65 minutes
+- Learning purpose: how proposals describe intent, target, changes, rationale, and source hash
+- Files: `notes/learning_log.md`, `remediation_templates.py`, `tests/test_remediation_templates.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_remediation_templates.py`
+- Prompt: `prompts/course_labs/day03_lab03_create-the-remediationproposal-data-contract.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 3 · Lab 4 · Implement Require Human Approval
+- Estimated time: 60 minutes
+- Learning purpose: how one deterministic field change mitigates high-impact autonomous actions
+- Files: `notes/learning_log.md`, `remediation_templates.py`, `tests/test_remediation_templates.py`, `approval.py`, `proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_remediation_templates.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day03_lab04_implement-require-human-approval.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 3 · Lab 5 · Implement Assign Owner With Required Input
+- Estimated time: 60 minutes
+- Learning purpose: how user-supplied values are validated before proposal creation
+- Files: `notes/learning_log.md`, `remediation_templates.py`, `tests/test_remediation_templates.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_remediation_templates.py`
+- Prompt: `prompts/course_labs/day03_lab05_implement-assign-owner-with-required-input.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 3 · Lab 6 · Implement Remove Broad Admin Tool
+- Estimated time: 65 minutes
+- Learning purpose: how an allowlisted transformation removes wildcard and administrator tools
+- Files: `notes/learning_log.md`, `remediation_templates.py`, `tests/test_remediation_templates.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_remediation_templates.py`
+- Prompt: `prompts/course_labs/day03_lab06_implement-remove-broad-admin-tool.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 3 · Lab 7 · Apply Proposals To Deep Copies Only
+- Estimated time: 55 minutes
+- Learning purpose: how the original source remains unchanged during planning
+- Files: `notes/learning_log.md`, `remediation_templates.py`, `tests/test_remediation_templates.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_remediation_templates.py`
+- Prompt: `prompts/course_labs/day03_lab07_apply-proposals-to-deep-copies-only.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 3 · Lab 8 · Write Template And Immutability Tests
+- Estimated time: 75 minutes
+- Learning purpose: how tests prove only approved templates and fields can change
+- Files: `notes/learning_log.md`, `remediation_templates.py`, `tests/test_remediation_templates.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_remediation_templates.py`
+- Prompt: `prompts/course_labs/day03_lab08_write-template-and-immutability-tests.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 4 · Lab 1 · Understand Canonical Json And Sha 256
+- Estimated time: 65 minutes
+- Learning purpose: how identical structured data produces a stable fingerprint
+- Files: `notes/learning_log.md`, `proposal_hash.py`, `approval.py`, `tests/test_proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_proposal_hash.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day04_lab01_understand-canonical-json-and-sha-256.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 4 · Lab 2 · Build Canonical Json And Sha256 Value Helpers
+- Estimated time: 60 minutes
+- Learning purpose: how sorting keys and fixed separators prevent accidental hash variation
+- Files: `notes/learning_log.md`, `proposal_hash.py`, `approval.py`, `tests/test_proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_proposal_hash.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day04_lab02_build-canonical-json-and-sha256-value-helpers.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 4 · Lab 3 · Hash The Exact Source Environment
+- Estimated time: 50 minutes
+- Learning purpose: how approval can be tied to what was reviewed
+- Files: `notes/learning_log.md`, `proposal_hash.py`, `approval.py`, `tests/test_proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_proposal_hash.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day04_lab03_hash-the-exact-source-environment.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 4 · Lab 4 · Hash The Complete Remediation Proposal
+- Estimated time: 50 minutes
+- Learning purpose: how a changed target, field, or value invalidates old approval
+- Files: `notes/learning_log.md`, `proposal_hash.py`, `approval.py`, `tests/test_proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_proposal_hash.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day04_lab04_hash-the-complete-remediation-proposal.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 4 · Lab 5 · Create The Approvalrecord Data Contract
+- Estimated time: 60 minutes
+- Learning purpose: how reviewer, decision, reason, time, and hashes become audit evidence
+- Files: `notes/learning_log.md`, `proposal_hash.py`, `approval.py`, `tests/test_proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_proposal_hash.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day04_lab05_create-the-approvalrecord-data-contract.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 4 · Lab 6 · Implement Approve And Reject Decisions
+- Estimated time: 60 minutes
+- Learning purpose: how the product records an explicit human choice
+- Files: `notes/learning_log.md`, `proposal_hash.py`, `approval.py`, `tests/test_proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_proposal_hash.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day04_lab06_implement-approve-and-reject-decisions.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 4 · Lab 7 · Reject Changed Proposal And Changed Source Hashes
+- Estimated time: 65 minutes
+- Learning purpose: how stale approval is blocked automatically
+- Files: `notes/learning_log.md`, `proposal_hash.py`, `approval.py`, `tests/test_proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_proposal_hash.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day04_lab07_reject-changed-proposal-and-changed-source-hashes.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 4 · Lab 8 · Write Exact Approval And Stale Approval Tests
+- Estimated time: 70 minutes
+- Learning purpose: how negative tests prove approval cannot be replayed
+- Files: `notes/learning_log.md`, `proposal_hash.py`, `approval.py`, `tests/test_proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_proposal_hash.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day04_lab08_write-exact-approval-and-stale-approval-tests.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 5 · Lab 1 · Understand Workflow States And Terminal States
+- Estimated time: 60 minutes
+- Learning purpose: why a safe process must know whether it is discovered, proposed, approved, or verified
+- Files: `notes/learning_log.md`, `workflow.py`, `audit_db.py`, `tests/test_workflow.py`, `tests/test_audit_db.py`, `docs/v4_state_machine.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_workflow.py tests/test_audit_db.py`
+- Prompt: `prompts/course_labs/day05_lab01_understand-workflow-states-and-terminal-states.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 5 · Lab 2 · Define The V4 State List And Transition Map
+- Estimated time: 60 minutes
+- Learning purpose: how an allowlist applies to process movement as well as tools
+- Files: `notes/learning_log.md`, `workflow.py`, `audit_db.py`, `tests/test_workflow.py`, `tests/test_audit_db.py`, `docs/v4_state_machine.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_workflow.py tests/test_audit_db.py`
+- Prompt: `prompts/course_labs/day05_lab02_define-the-v4-state-list-and-transition-map.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 5 · Lab 3 · Implement Transition Validation
+- Estimated time: 55 minutes
+- Learning purpose: how state skipping becomes a clear error
+- Files: `notes/learning_log.md`, `workflow.py`, `audit_db.py`, `tests/test_workflow.py`, `tests/test_audit_db.py`, `docs/v4_state_machine.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_workflow.py tests/test_audit_db.py`
+- Prompt: `prompts/course_labs/day05_lab03_implement-transition-validation.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 5 · Lab 4 · Design The Sqlite Workflow Events Table
+- Estimated time: 60 minutes
+- Learning purpose: how a local relational database preserves ordered event history
+- Files: `notes/learning_log.md`, `workflow.py`, `audit_db.py`, `tests/test_workflow.py`, `tests/test_audit_db.py`, `docs/v4_state_machine.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_workflow.py tests/test_audit_db.py`
+- Prompt: `prompts/course_labs/day05_lab04_design-the-sqlite-workflow-events-table.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 5 · Lab 5 · Implement Database Initialization And Event Writes
+- Estimated time: 70 minutes
+- Learning purpose: how every transition becomes durable evidence
+- Files: `notes/learning_log.md`, `workflow.py`, `audit_db.py`, `tests/test_workflow.py`, `tests/test_audit_db.py`, `docs/v4_state_machine.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_workflow.py tests/test_audit_db.py`
+- Prompt: `prompts/course_labs/day05_lab05_implement-database-initialization-and-event-writes.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 5 · Lab 6 · Implement Ordered Event Retrieval
+- Estimated time: 50 minutes
+- Learning purpose: how a reviewer reconstructs what happened
+- Files: `notes/learning_log.md`, `workflow.py`, `audit_db.py`, `tests/test_workflow.py`, `tests/test_audit_db.py`, `docs/v4_state_machine.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python evals/run_v4_evals.py`
+- Prompt: `prompts/course_labs/day05_lab06_implement-ordered-event-retrieval.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 5 · Lab 7 · Write State Skip And Event Order Tests
+- Estimated time: 65 minutes
+- Learning purpose: how tests prove the control flow cannot jump ahead
+- Files: `notes/learning_log.md`, `workflow.py`, `audit_db.py`, `tests/test_workflow.py`, `tests/test_audit_db.py`, `docs/v4_state_machine.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_workflow.py tests/test_audit_db.py`
+- Prompt: `prompts/course_labs/day05_lab07_write-state-skip-and-event-order-tests.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 5 · Lab 8 · Inspect The Audit Database With Python
+- Estimated time: 55 minutes
+- Learning purpose: how to view rows without needing a separate database application
+- Files: `notes/learning_log.md`, `workflow.py`, `audit_db.py`, `tests/test_workflow.py`, `tests/test_audit_db.py`, `docs/v4_state_machine.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_workflow.py tests/test_audit_db.py`
+- Prompt: `prompts/course_labs/day05_lab08_inspect-the-audit-database-with-python.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 6 · Lab 1 · Understand Verification Versus Approval
+- Estimated time: 55 minutes
+- Learning purpose: why a human can approve intent while software still checks correctness
+- Files: `notes/learning_log.md`, `verifier.py`, `scanner.py`, `tests/test_verifier.py`, `approval.py`, `proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_verifier.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day06_lab01_understand-verification-versus-approval.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 6 · Lab 2 · Create An Isolated Temporary Verification Directory
+- Estimated time: 55 minutes
+- Learning purpose: how temporary files prevent direct modification of the source
+- Files: `notes/learning_log.md`, `verifier.py`, `scanner.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day06_lab02_create-an-isolated-temporary-verification-directory.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 6 · Lab 3 · Apply The Proposal Only To The Isolated Candidate
+- Estimated time: 60 minutes
+- Learning purpose: how candidate state is produced for testing
+- Files: `notes/learning_log.md`, `verifier.py`, `scanner.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day06_lab03_apply-the-proposal-only-to-the-isolated-candidate.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 6 · Lab 4 · Rescan Before And After Risk Results
+- Estimated time: 65 minutes
+- Learning purpose: how remediation must not increase the high-risk count
+- Files: `notes/learning_log.md`, `verifier.py`, `scanner.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day06_lab04_rescan-before-and-after-risk-results.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 6 · Lab 5 · Add Structural And Serialization Checks
+- Estimated time: 55 minutes
+- Learning purpose: how to catch malformed candidate data
+- Files: `notes/learning_log.md`, `verifier.py`, `scanner.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day06_lab05_add-structural-and-serialization-checks.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 6 · Lab 6 · Add Target Count And Allowlisted Key Checks
+- Estimated time: 55 minutes
+- Learning purpose: how verification ensures the proposal touched exactly one intended object
+- Files: `notes/learning_log.md`, `verifier.py`, `scanner.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day06_lab06_add-target-count-and-allowlisted-key-checks.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 6 · Lab 7 · Create A Detailed Verificationresult
+- Estimated time: 55 minutes
+- Learning purpose: how pass/fail evidence is displayed and audited
+- Files: `notes/learning_log.md`, `verifier.py`, `scanner.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day06_lab07_create-a-detailed-verificationresult.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 6 · Lab 8 · Write Verifier Positive And Failure Tests
+- Estimated time: 75 minutes
+- Learning purpose: how a proposal cannot advance when any required check fails
+- Files: `notes/learning_log.md`, `verifier.py`, `scanner.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day06_lab08_write-verifier-positive-and-failure-tests.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 7 · Lab 1 · Define Repository Branch And File Path Allowlists
+- Estimated time: 60 minutes
+- Learning purpose: how configuration prevents command injection and wrong-target changes
+- Files: `notes/learning_log.md`, `github_plan.py`, `tests/test_github_plan.py`, `docs/v4_github_demo_setup.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day07_lab01_define-repository-branch-and-file-path-allowlists.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 7 · Lab 2 · Create The Githubplan Data Contract
+- Estimated time: 55 minutes
+- Learning purpose: how exact commands become reviewable data before execution
+- Files: `notes/learning_log.md`, `github_plan.py`, `tests/test_github_plan.py`, `docs/v4_github_demo_setup.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day07_lab02_create-the-githubplan-data-contract.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 7 · Lab 3 · Build Safe Branch And Commit Commands
+- Estimated time: 65 minutes
+- Learning purpose: how a remediation is isolated from main
+- Files: `notes/learning_log.md`, `github_plan.py`, `tests/test_github_plan.py`, `docs/v4_github_demo_setup.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day07_lab03_build-safe-branch-and-commit-commands.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 7 · Lab 4 · Build The Draft Pull Request Command
+- Estimated time: 55 minutes
+- Learning purpose: how `--draft` guarantees the change begins in review state
+- Files: `notes/learning_log.md`, `github_plan.py`, `tests/test_github_plan.py`, `docs/v4_github_demo_setup.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day07_lab04_build-the-draft-pull-request-command.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 7 · Lab 5 · Implement Dry Run Execution As The Default
+- Estimated time: 60 minutes
+- Learning purpose: how users can inspect every command without changing GitHub
+- Files: `notes/learning_log.md`, `github_plan.py`, `tests/test_github_plan.py`, `docs/v4_github_demo_setup.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day07_lab05_implement-dry-run-execution-as-the-default.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 7 · Lab 6 · Add Explicit Opt In Live Execution
+- Estimated time: 60 minutes
+- Learning purpose: how action authority is separated from plan generation
+- Files: `notes/learning_log.md`, `github_plan.py`, `tests/test_github_plan.py`, `docs/v4_github_demo_setup.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day07_lab06_add-explicit-opt-in-live-execution.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 7 · Lab 7 · Block Unapproved Repositories Paths And Branch Names
+- Estimated time: 60 minutes
+- Learning purpose: how input validation protects the command boundary
+- Files: `notes/learning_log.md`, `github_plan.py`, `tests/test_github_plan.py`, `docs/v4_github_demo_setup.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day07_lab07_block-unapproved-repositories-paths-and-branch-names.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 7 · Lab 8 · Write Draft Only And Dry Run Automated Tests
+- Estimated time: 70 minutes
+- Learning purpose: how tests prove there is no merge or main-branch command
+- Files: `notes/learning_log.md`, `github_plan.py`, `tests/test_github_plan.py`, `docs/v4_github_demo_setup.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day07_lab08_write-draft-only-and-dry-run-automated-tests.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 8 · Lab 1 · Understand Rollback Before And After Merge
+- Estimated time: 55 minutes
+- Learning purpose: why closing a draft is simple but undoing a merged change requires a reviewed revert
+- Files: `notes/learning_log.md`, `rollback.py`, `workflow.py`, `evals/run_v4_evals.py`, `tests/test_rollback.py`, `tests/test_failure_paths.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_rollback.py tests/test_failure_paths.py`
+- Prompt: `prompts/course_labs/day08_lab01_understand-rollback-before-and-after-merge.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 8 · Lab 2 · Create The Pre Merge Rollback Command Plan
+- Estimated time: 55 minutes
+- Learning purpose: how to close a pull request and delete its branch
+- Files: `notes/learning_log.md`, `rollback.py`, `workflow.py`, `evals/run_v4_evals.py`, `tests/test_rollback.py`, `tests/test_failure_paths.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_rollback.py tests/test_failure_paths.py`
+- Prompt: `prompts/course_labs/day08_lab02_create-the-pre-merge-rollback-command-plan.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 8 · Lab 3 · Refuse Automatic Rollback After Merge
+- Estimated time: 50 minutes
+- Learning purpose: how the product avoids silently changing shared history
+- Files: `notes/learning_log.md`, `rollback.py`, `workflow.py`, `evals/run_v4_evals.py`, `tests/test_rollback.py`, `tests/test_failure_paths.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_rollback.py tests/test_failure_paths.py`
+- Prompt: `prompts/course_labs/day08_lab03_refuse-automatic-rollback-after-merge.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 8 · Lab 4 · Record Rejected Failed And Rolled Back Terminal States
+- Estimated time: 60 minutes
+- Learning purpose: how the audit trail remains complete when work does not succeed
+- Files: `notes/learning_log.md`, `rollback.py`, `workflow.py`, `evals/run_v4_evals.py`, `tests/test_rollback.py`, `tests/test_failure_paths.py`, `tests/test_workflow.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_rollback.py tests/test_failure_paths.py tests/test_workflow.py`
+- Prompt: `prompts/course_labs/day08_lab04_record-rejected-failed-and-rolled-back-terminal-states.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 8 · Lab 5 · Simulate Verification Failure
+- Estimated time: 55 minutes
+- Learning purpose: how a failed check stops GitHub planning
+- Files: `notes/learning_log.md`, `rollback.py`, `workflow.py`, `evals/run_v4_evals.py`, `tests/test_rollback.py`, `tests/test_failure_paths.py`, `verifier.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_rollback.py tests/test_failure_paths.py tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day08_lab05_simulate-verification-failure.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 8 · Lab 6 · Simulate Stale Approval
+- Estimated time: 55 minutes
+- Learning purpose: how changed data forces a new human review
+- Files: `notes/learning_log.md`, `rollback.py`, `workflow.py`, `evals/run_v4_evals.py`, `tests/test_rollback.py`, `tests/test_failure_paths.py`, `approval.py`, `proposal_hash.py`, `tests/test_approval.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_rollback.py tests/test_failure_paths.py tests/test_approval.py`
+- Prompt: `prompts/course_labs/day08_lab06_simulate-stale-approval.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 8 · Lab 7 · Simulate Github Authentication And Command Failure
+- Estimated time: 65 minutes
+- Learning purpose: how external-system errors are surfaced without partial continuation
+- Files: `notes/learning_log.md`, `rollback.py`, `workflow.py`, `evals/run_v4_evals.py`, `tests/test_rollback.py`, `tests/test_failure_paths.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_rollback.py tests/test_failure_paths.py`
+- Prompt: `prompts/course_labs/day08_lab07_simulate-github-authentication-and-command-failure.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 8 · Lab 8 · Run The V4 Failure Injection Evaluation
+- Estimated time: 60 minutes
+- Learning purpose: how negative scenarios prove the system fails closed
+- Files: `notes/learning_log.md`, `rollback.py`, `workflow.py`, `evals/run_v4_evals.py`, `tests/test_rollback.py`, `tests/test_failure_paths.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python evals/run_v4_evals.py`
+- Prompt: `prompts/course_labs/day08_lab08_run-the-v4-failure-injection-evaluation.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 9 · Lab 1 · Map The V4 Streamlit User Journey
+- Estimated time: 50 minutes
+- Learning purpose: how discovery, proposal, approval, verification, plan, and audit are shown in order
+- Files: `notes/learning_log.md`, `app_v4.py`, `Dockerfile`, `.dockerignore`, `compose.yaml`, `.github/workflows/tests.yml`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `streamlit run app_v4.py`
+- Prompt: `prompts/course_labs/day09_lab01_map-the-v4-streamlit-user-journey.txt`
+- Done when: The AgentGuard v4 page opens locally and the new control or result is visible. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 9 · Lab 2 · Create App V4 Py Input And Proposal Controls
+- Estimated time: 75 minutes
+- Learning purpose: how the user selects an agent and one allowlisted template
+- Files: `notes/learning_log.md`, `app_v4.py`, `Dockerfile`, `.dockerignore`, `compose.yaml`, `.github/workflows/tests.yml`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day09_lab02_create-app-v4-py-input-and-proposal-controls.txt`
+- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 9 · Lab 3 · Display Hashes Approval Verification And Events
+- Estimated time: 65 minutes
+- Learning purpose: how the UI makes invisible control evidence visible
+- Files: `notes/learning_log.md`, `app_v4.py`, `Dockerfile`, `.dockerignore`, `compose.yaml`, `.github/workflows/tests.yml`, `approval.py`, `proposal_hash.py`, `tests/test_approval.py`, `tests/test_proposal_hash.py`, `verifier.py`, `tests/test_verifier.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_approval.py tests/test_proposal_hash.py tests/test_verifier.py`
+- Prompt: `prompts/course_labs/day09_lab03_display-hashes-approval-verification-and-events.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 9 · Lab 4 · Display The Github Dry Run Plan And Safety Warnings
+- Estimated time: 55 minutes
+- Learning purpose: how users review exact actions before enabling live execution
+- Files: `notes/learning_log.md`, `app_v4.py`, `Dockerfile`, `.dockerignore`, `compose.yaml`, `.github/workflows/tests.yml`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `streamlit run app_v4.py`
+- Prompt: `prompts/course_labs/day09_lab04_display-the-github-dry-run-plan-and-safety-warnings.txt`
+- Done when: The AgentGuard v4 page opens locally and the new control or result is visible. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 9 · Lab 5 · Install Docker Desktop And Verify Docker Commands
+- Estimated time: 60 minutes
+- Learning purpose: how containers package Python and dependencies consistently
+- Files: `notes/learning_log.md`, `app_v4.py`, `Dockerfile`, `.dockerignore`, `compose.yaml`, `.github/workflows/tests.yml`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `docker --version` ; `docker compose version` ; `docker info`
+- Prompt: `prompts/course_labs/day09_lab05_install-docker-desktop-and-verify-docker-commands.txt`
+- Done when: Docker reports healthy commands or the AgentGuard container starts in mock/dry-run mode. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 9 · Lab 6 · Create Dockerfile Dockerignore And Compose Yaml
+- Estimated time: 80 minutes
+- Learning purpose: how the application becomes a reproducible local service without including secrets
+- Files: `notes/learning_log.md`, `app_v4.py`, `Dockerfile`, `.dockerignore`, `compose.yaml`, `.github/workflows/tests.yml`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day09_lab06_create-dockerfile-dockerignore-and-compose-yaml.txt`
+- Done when: Docker reports healthy commands or the AgentGuard container starts in mock/dry-run mode. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 9 · Lab 7 · Build And Run The Container In Mock And Dry Run Mode
+- Estimated time: 75 minutes
+- Learning purpose: how to test the packaged product at localhost
+- Files: `notes/learning_log.md`, `app_v4.py`, `Dockerfile`, `.dockerignore`, `compose.yaml`, `.github/workflows/tests.yml`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day09_lab07_build-and-run-the-container-in-mock-and-dry-run-mode.txt`
+- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 9 · Lab 8 · Update Ci And Ask Claude Code For A Final Security Review
+- Estimated time: 80 minutes
+- Learning purpose: how all versions remain tested and the action boundary is challenged
+- Files: `notes/learning_log.md`, `app_v4.py`, `Dockerfile`, `.dockerignore`, `compose.yaml`, `.github/workflows/tests.yml`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day09_lab08_update-ci-and-ask-claude-code-for-a-final-security-review.txt`
+- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 10 · Lab 1 · Run The Complete V4 Release Gate
+- Estimated time: 70 minutes
+- Learning purpose: how one command proves all inherited and v4 controls
+- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`, `docs/post_mvp_backlog.md`, `evidence/README.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python scripts/run_release_gate.py`
+- Prompt: `prompts/course_labs/day10_lab01_run-the-complete-v4-release-gate.txt`
+- Done when: The terminal ends with RELEASE GATE PASS for AgentGuard v4. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 10 · Lab 2 · Run The Full Local Browser Scenario
+- Estimated time: 60 minutes
+- Learning purpose: how a finding becomes a verified proposal and dry-run plan
+- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`, `docs/post_mvp_backlog.md`, `evidence/README.md`, `app_v4.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `streamlit run app_v4.py`
+- Prompt: `prompts/course_labs/day10_lab02_run-the-full-local-browser-scenario.txt`
+- Done when: The AgentGuard v4 page opens locally and the new control or result is visible. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 10 · Lab 3 · Optionally Create One Draft Pull Request In The Demo Reposit
+- Estimated time: 75 minutes
+- Learning purpose: how to perform the only live write action with explicit review and no merge
+- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`, `docs/post_mvp_backlog.md`, `evidence/README.md`, `github_plan.py`, `tests/test_github_plan.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_github_plan.py`
+- Prompt: `prompts/course_labs/day10_lab03_optionally-create-one-draft-pull-request-in-the-demo-reposit.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 10 · Lab 4 · Demonstrate Rollback Of The Unmerged Draft
+- Estimated time: 55 minutes
+- Learning purpose: how to close the loop safely
+- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`, `docs/post_mvp_backlog.md`, `evidence/README.md`, `rollback.py`, `tests/test_rollback.py`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_rollback.py`
+- Prompt: `prompts/course_labs/day10_lab04_demonstrate-rollback-of-the-unmerged-draft.txt`
+- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 10 · Lab 5 · Finalize Readme Architecture Threat Model And Test Report
 - Estimated time: 90 minutes
-- Learning purpose: how a client starts the server, initializes a session, lists tools, and calls one
-- Files: `notes/learning_log.md`, `mcp_client.py`, `mcp_server.py`, `scripts/run_mcp_live_smoke.py`, `docs/v3_inspector_walkthrough.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python scripts/run_mcp_live_smoke.py`
-- Prompt: `prompts/course_labs/day06_lab05_build-the-independent-stdio-mcp-client.txt`
-- Done when: The current MCP 2.x contract is used; the tool set remains exactly five read-only tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 6 · Lab 6 · Validate The Server Exposed Tool Allowlist In The Client
-- Estimated time: 55 minutes
-- Learning purpose: how the client refuses unexpected server capabilities
-- Files: `notes/learning_log.md`, `mcp_client.py`, `mcp_server.py`, `scripts/run_mcp_live_smoke.py`, `docs/v3_inspector_walkthrough.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day06_lab06_validate-the-server-exposed-tool-allowlist-in-the-client.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 6 · Lab 7 · Handle Unavailable Server And Malformed Response Errors
-- Estimated time: 70 minutes
-- Learning purpose: how integration failures become controlled product errors
-- Files: `notes/learning_log.md`, `mcp_client.py`, `mcp_server.py`, `scripts/run_mcp_live_smoke.py`, `docs/v3_inspector_walkthrough.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day06_lab07_handle-unavailable-server-and-malformed-response-errors.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 6 · Lab 8 · Save Inspector And Client Evidence
-- Estimated time: 35 minutes
-- Learning purpose: how to prove protocol-level behavior during an interview
-- Files: `notes/learning_log.md`, `mcp_client.py`, `mcp_server.py`, `scripts/run_mcp_live_smoke.py`, `docs/v3_inspector_walkthrough.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `npx @modelcontextprotocol/inspector --help`
-- Prompt: `prompts/course_labs/day06_lab08_save-inspector-and-client-evidence.txt`
-- Done when: MCP Inspector starts locally and can list the five read-only AgentGuard discovery tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 7 · Lab 1 · Define The Mcp To Agentguard Adapter Contract
-- Estimated time: 55 minutes
-- Learning purpose: why external schemas should not flow directly into internal business logic
-- Files: `notes/learning_log.md`, `discovery_adapter.py`, `scanner.py`, `v2_service.py`, `tests/test_discovery_adapter.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_adapter.py`
-- Prompt: `prompts/course_labs/day07_lab01_define-the-mcp-to-agentguard-adapter-contract.txt`
+- Learning purpose: how documentation turns code into an enterprise product case study
+- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`, `docs/post_mvp_backlog.md`, `evidence/README.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day10_lab05_finalize-readme-architecture-threat-model-and-test-report.txt`
 - Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 7 · Lab 2 · Validate Every Required Agent Field
-- Estimated time: 65 minutes
-- Learning purpose: how missing identity, tools, owner, or approval information is rejected
-- Files: `notes/learning_log.md`, `discovery_adapter.py`, `scanner.py`, `v2_service.py`, `tests/test_discovery_adapter.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_adapter.py`
-- Prompt: `prompts/course_labs/day07_lab02_validate-every-required-agent-field.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 7 · Lab 3 · Normalize The Discovered Environment
-- Estimated time: 60 minutes
-- Learning purpose: how the adapter produces the exact v1 scanner shape
-- Files: `notes/learning_log.md`, `discovery_adapter.py`, `scanner.py`, `v2_service.py`, `tests/test_discovery_adapter.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_adapter.py`
-- Prompt: `prompts/course_labs/day07_lab03_normalize-the-discovered-environment.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 7 · Lab 4 · Preserve Source Hash And Correlation Id
-- Estimated time: 45 minutes
-- Learning purpose: how provenance stays attached to the risk report
-- Files: `notes/learning_log.md`, `discovery_adapter.py`, `scanner.py`, `v2_service.py`, `tests/test_discovery_adapter.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_adapter.py`
-- Prompt: `prompts/course_labs/day07_lab04_preserve-source-hash-and-correlation-id.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 7 · Lab 5 · Scan The Mcp Discovered Inventory
-- Estimated time: 60 minutes
-- Learning purpose: how v1 deterministic policy remains reusable behind a new integration
-- Files: `notes/learning_log.md`, `discovery_adapter.py`, `scanner.py`, `v2_service.py`, `tests/test_discovery_adapter.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_adapter.py`
-- Prompt: `prompts/course_labs/day07_lab05_scan-the-mcp-discovered-inventory.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 7 · Lab 6 · Pass Discovered Findings Into The V2 Grounded Analyst
+## Day 10 · Lab 6 · Create The Final Evidence Package And Five Minute Video Plan
 - Estimated time: 75 minutes
-- Learning purpose: how v3 composes discovery, policy, retrieval, and explanation
-- Files: `notes/learning_log.md`, `discovery_adapter.py`, `scanner.py`, `v2_service.py`, `tests/test_discovery_adapter.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_adapter.py`
-- Prompt: `prompts/course_labs/day07_lab06_pass-discovered-findings-into-the-v2-grounded-analyst.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 7 · Lab 7 · Write Adapter Positive And Negative Tests
-- Estimated time: 70 minutes
-- Learning purpose: how malformed server data cannot silently enter AgentGuard
-- Files: `notes/learning_log.md`, `discovery_adapter.py`, `scanner.py`, `v2_service.py`, `tests/test_discovery_adapter.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_adapter.py`
-- Prompt: `prompts/course_labs/day07_lab07_write-adapter-positive-and-negative-tests.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 7 · Lab 8 · Run The Complete Discovery To Analysis Flow
-- Estimated time: 60 minutes
-- Learning purpose: how the first end-to-end connected scenario works
-- Files: `notes/learning_log.md`, `discovery_adapter.py`, `scanner.py`, `v2_service.py`, `tests/test_discovery_adapter.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_discovery_adapter.py`
-- Prompt: `prompts/course_labs/day07_lab08_run-the-complete-discovery-to-analysis-flow.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 8 · Lab 1 · Create The V3 Threat Model Attack Checklist
-- Estimated time: 55 minutes
-- Learning purpose: how security design begins with explicit abuse cases
-- Files: `notes/learning_log.md`, `docs/v3_threat_model.md`, `mcp_security.py`, `tests/test_mcp_security.py`, `tests/test_untrusted_content.py`, `evals/run_v3_evals.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_security.py tests/test_untrusted_content.py`
-- Prompt: `prompts/course_labs/day08_lab01_create-the-v3-threat-model-attack-checklist.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 8 · Lab 2 · Test Path Traversal And Absolute Paths
-- Estimated time: 60 minutes
-- Learning purpose: how `../` and `/etc/...` attempts should fail
-- Files: `notes/learning_log.md`, `docs/v3_threat_model.md`, `mcp_security.py`, `tests/test_mcp_security.py`, `tests/test_untrusted_content.py`, `evals/run_v3_evals.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_security.py tests/test_untrusted_content.py`
-- Prompt: `prompts/course_labs/day08_lab02_test-path-traversal-and-absolute-paths.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 8 · Lab 3 · Test Unapproved Filenames And Symlink Escape
-- Estimated time: 65 minutes
-- Learning purpose: how fixed allowlists protect even when a file exists
-- Files: `notes/learning_log.md`, `docs/v3_threat_model.md`, `mcp_security.py`, `tests/test_mcp_security.py`, `tests/test_untrusted_content.py`, `evals/run_v3_evals.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_security.py tests/test_untrusted_content.py`
-- Prompt: `prompts/course_labs/day08_lab03_test-unapproved-filenames-and-symlink-escape.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 8 · Lab 4 · Test Missing Fields Wrong Types And Oversized Names
-- Estimated time: 65 minutes
-- Learning purpose: how schema validation limits malformed input
-- Files: `notes/learning_log.md`, `docs/v3_threat_model.md`, `mcp_security.py`, `tests/test_mcp_security.py`, `tests/test_untrusted_content.py`, `evals/run_v3_evals.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_security.py tests/test_untrusted_content.py`
-- Prompt: `prompts/course_labs/day08_lab04_test-missing-fields-wrong-types-and-oversized-names.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 8 · Lab 5 · Test Prompt Injection As Untrusted Data
-- Estimated time: 60 minutes
-- Learning purpose: why the server must not turn connected text into instructions
-- Files: `notes/learning_log.md`, `docs/v3_threat_model.md`, `mcp_security.py`, `tests/test_mcp_security.py`, `tests/test_untrusted_content.py`, `evals/run_v3_evals.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_security.py tests/test_untrusted_content.py`
-- Prompt: `prompts/course_labs/day08_lab05_test-prompt-injection-as-untrusted-data.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 8 · Lab 6 · Test An Unexpected Server Tool Name
-- Estimated time: 55 minutes
-- Learning purpose: how clients defend against capability expansion
-- Files: `notes/learning_log.md`, `docs/v3_threat_model.md`, `mcp_security.py`, `tests/test_mcp_security.py`, `tests/test_untrusted_content.py`, `evals/run_v3_evals.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_security.py tests/test_untrusted_content.py`
-- Prompt: `prompts/course_labs/day08_lab06_test-an-unexpected-server-tool-name.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 8 · Lab 7 · Verify The Connected Files Are Byte For Byte Unchanged
-- Estimated time: 50 minutes
-- Learning purpose: how hashes prove v3 performed no writes
-- Files: `notes/learning_log.md`, `docs/v3_threat_model.md`, `mcp_security.py`, `tests/test_mcp_security.py`, `tests/test_untrusted_content.py`, `evals/run_v3_evals.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python -m pytest -q tests/test_mcp_security.py tests/test_untrusted_content.py`
-- Prompt: `prompts/course_labs/day08_lab07_verify-the-connected-files-are-byte-for-byte-unchanged.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 8 · Lab 8 · Run And Document The V3 Security Evaluation Suite
-- Estimated time: 55 minutes
-- Learning purpose: how multiple controls become one release-gate artifact
-- Files: `notes/learning_log.md`, `docs/v3_threat_model.md`, `mcp_security.py`, `tests/test_mcp_security.py`, `tests/test_untrusted_content.py`, `evals/run_v3_evals.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python evals/run_v3_evals.py`
-- Prompt: `prompts/course_labs/day08_lab08_run-and-document-the-v3-security-evaluation-suite.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 9 · Lab 1 · Map The V3 Streamlit Discovery Journey
-- Estimated time: 45 minutes
-- Learning purpose: how users initiate discovery and understand the boundary
-- Files: `notes/learning_log.md`, `app_v3.py`, `discovery_adapter.py`, `audit_log.py`, `.github/workflows/tests.yml`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `streamlit run app_v3.py`
-- Prompt: `prompts/course_labs/day09_lab01_map-the-v3-streamlit-discovery-journey.txt`
-- Done when: The AgentGuard v3 page opens locally and the new control or result is visible. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 9 · Lab 2 · Create App V3 Py With Debug And Mcp Paths
-- Estimated time: 75 minutes
-- Learning purpose: how a direct core path helps isolate transport problems
-- Files: `notes/learning_log.md`, `app_v3.py`, `discovery_adapter.py`, `audit_log.py`, `.github/workflows/tests.yml`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day09_lab02_create-app-v3-py-with-debug-and-mcp-paths.txt`
-- Done when: The current MCP 2.x contract is used; the tool set remains exactly five read-only tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 9 · Lab 3 · Display Inventory Provenance And Risk Results
-- Estimated time: 65 minutes
-- Learning purpose: how source hashes and correlation IDs become visible evidence
-- Files: `notes/learning_log.md`, `app_v3.py`, `discovery_adapter.py`, `audit_log.py`, `.github/workflows/tests.yml`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `streamlit run app_v3.py`
-- Prompt: `prompts/course_labs/day09_lab03_display-inventory-provenance-and-risk-results.txt`
-- Done when: The AgentGuard v3 page opens locally and the new control or result is visible. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 9 · Lab 4 · Add Safe Mcp Error Handling
-- Estimated time: 55 minutes
-- Learning purpose: how server failures are explained without exposing secrets
-- Files: `notes/learning_log.md`, `app_v3.py`, `discovery_adapter.py`, `audit_log.py`, `.github/workflows/tests.yml`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day09_lab04_add-safe-mcp-error-handling.txt`
-- Done when: The current MCP 2.x contract is used; the tool set remains exactly five read-only tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 9 · Lab 5 · Add Read Only Discovery Audit Events
-- Estimated time: 60 minutes
-- Learning purpose: how to record calls, tool names, hashes, and outcomes
-- Files: `notes/learning_log.md`, `app_v3.py`, `discovery_adapter.py`, `audit_log.py`, `.github/workflows/tests.yml`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day09_lab05_add-read-only-discovery-audit-events.txt`
+- Learning purpose: how to show the system without exposing credentials
+- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`, `docs/post_mvp_backlog.md`, `evidence/README.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day10_lab06_create-the-final-evidence-package-and-five-minute-video-plan.txt`
 - Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
 
-## Day 9 · Lab 6 · Update Github Actions For V3 Tests And Evals
+## Day 10 · Lab 7 · Prepare Deep Technical And Product Interview Answers
+- Estimated time: 90 minutes
+- Learning purpose: how to explain identity, policy, MCP, RAG, guardrails, approvals, verification, audit, and rollback
+- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`, `docs/post_mvp_backlog.md`, `evidence/README.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day10_lab07_prepare-deep-technical-and-product-interview-answers.txt`
+- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Day 10 · Lab 8 · Define Post Mvp Backlog And Job Search Integration
 - Estimated time: 60 minutes
-- Learning purpose: how CI proves all inherited and new behavior
-- Files: `notes/learning_log.md`, `app_v3.py`, `discovery_adapter.py`, `audit_log.py`, `.github/workflows/tests.yml`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python evals/run_v3_evals.py`
-- Prompt: `prompts/course_labs/day09_lab06_update-github-actions-for-v3-tests-and-evals.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 9 · Lab 7 · Ask Claude Code For An Mcp Security Review
-- Estimated time: 60 minutes
-- Learning purpose: how to challenge tool scope, validation, and trust assumptions
-- Files: `notes/learning_log.md`, `app_v3.py`, `discovery_adapter.py`, `audit_log.py`, `.github/workflows/tests.yml`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day09_lab07_ask-claude-code-for-an-mcp-security-review.txt`
-- Done when: The current MCP 2.x contract is used; the tool set remains exactly five read-only tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 9 · Lab 8 · Resolve Findings And Create The Release Candidate
-- Estimated time: 80 minutes
-- Learning purpose: how to stabilize integration code before final demonstration
-- Files: `notes/learning_log.md`, `app_v3.py`, `discovery_adapter.py`, `audit_log.py`, `.github/workflows/tests.yml`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day09_lab08_resolve-findings-and-create-the-release-candidate.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 10 · Lab 1 · Run The Complete V3 Release Gate
-- Estimated time: 60 minutes
-- Learning purpose: how one command proves v1, v2, and v3 tests and evaluations
-- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v3_architecture.md`, `docs/v3_interview_brief.md`, `docs/v3_to_v4_handoff.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `python scripts/run_release_gate.py`
-- Prompt: `prompts/course_labs/day10_lab01_run-the-complete-v3-release-gate.txt`
-- Done when: The terminal ends with RELEASE GATE PASS for AgentGuard v3. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 10 · Lab 2 · Verify The Server Exposes Exactly Five Read Only Tools
-- Estimated time: 40 minutes
-- Learning purpose: how source inspection and Inspector evidence support the claim
-- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v3_architecture.md`, `docs/v3_interview_brief.md`, `docs/v3_to_v4_handoff.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day10_lab02_verify-the-server-exposes-exactly-five-read-only-tools.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 10 · Lab 3 · Finalize The V3 Readme Architecture And Threat Model
-- Estimated time: 80 minutes
-- Learning purpose: how another engineer can reproduce the MCP integration
-- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v3_architecture.md`, `docs/v3_interview_brief.md`, `docs/v3_to_v4_handoff.md`, `evidence/README.md`, `docs/v3_threat_model.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day10_lab03_finalize-the-v3-readme-architecture-and-threat-model.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 10 · Lab 4 · Create Final Inspector Browser And Test Screenshots
-- Estimated time: 55 minutes
-- Learning purpose: how to capture protocol, product, and verification layers
-- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v3_architecture.md`, `docs/v3_interview_brief.md`, `docs/v3_to_v4_handoff.md`, `evidence/README.md`, `app_v3.py`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `npx @modelcontextprotocol/inspector --help`
-- Prompt: `prompts/course_labs/day10_lab04_create-final-inspector-browser-and-test-screenshots.txt`
-- Done when: pytest reports passed tests and no failed tests for the behavior changed in this lab. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 10 · Lab 5 · Practice The Five Minute V3 Product Demonstration
-- Estimated time: 75 minutes
-- Learning purpose: how to show connected discovery, provenance, policy scanning, and security controls
-- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v3_architecture.md`, `docs/v3_interview_brief.md`, `docs/v3_to_v4_handoff.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day10_lab05_practice-the-five-minute-v3-product-demonstration.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 10 · Lab 6 · Prepare Mcp And Agent Security Interview Answers
-- Estimated time: 75 minutes
-- Learning purpose: how to explain MCP architecture, authorization boundaries, and prompt injection
-- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v3_architecture.md`, `docs/v3_interview_brief.md`, `docs/v3_to_v4_handoff.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day10_lab06_prepare-mcp-and-agent-security-interview-answers.txt`
-- Done when: The current MCP 2.x contract is used; the tool set remains exactly five read-only tools. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 10 · Lab 7 · Review Public Repository Readiness
-- Estimated time: 40 minutes
-- Learning purpose: how to remove secrets, local paths, and noisy artifacts
-- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v3_architecture.md`, `docs/v3_interview_brief.md`, `docs/v3_to_v4_handoff.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day10_lab07_review-public-repository-readiness.txt`
-- Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.
-
-## Day 10 · Lab 8 · Create The V3 To V4 Governed Action Handoff
-- Estimated time: 45 minutes
-- Learning purpose: why v4 adds proposals and approval instead of adding a general write tool to v3
-- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v3_architecture.md`, `docs/v3_interview_brief.md`, `docs/v3_to_v4_handoff.md`, `evidence/README.md`
-- Commands: `cd ~/Developer/agentguard-v3` ; `source .venv/bin/activate` ; `git status --short`
-- Prompt: `prompts/course_labs/day10_lab08_create-the-v3-to-v4-governed-action-handoff.txt`
+- Learning purpose: how the completed prototype supports resume, LinkedIn, portfolio, and targeted interviews
+- Files: `notes/learning_log.md`, `scripts/run_release_gate.py`, `scripts/validate_starter_kit.py`, `README.md`, `START_HERE.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`, `docs/post_mvp_backlog.md`, `evidence/README.md`
+- Commands: `cd ~/Developer/agentguard-v4` ; `source .venv/bin/activate` ; `git status --short`
+- Prompt: `prompts/course_labs/day10_lab08_define-post-mvp-backlog-and-job-search-integration.txt`
 - Done when: The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes. You can explain the input, processing, output, safety boundary, and reason this lab exists.

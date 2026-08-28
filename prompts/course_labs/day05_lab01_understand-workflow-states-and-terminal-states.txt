@@ -1,0 +1,50 @@
+I am a beginner completing AgentGuard v4, Day 5, Lab 1: Understand Workflow States And Terminal States.
+
+Read `CLAUDE.md`, `docs/lab_execution_index.md`, and the current repository before changing anything. Stay inside `~/Developer/agentguard-v4`.
+
+## Learning goal
+why a safe process must know whether it is discovered, proposed, approved, or verified
+
+## Before any change
+1. Explain the concept in plain English and define every new technical term.
+2. Explain the input, processing, output, and security boundary for this lab.
+3. Inspect the files below and tell me whether each already exists.
+4. Present a short numbered plan and stop for my approval.
+
+## Exact relevant paths
+- `notes/learning_log.md`
+- `workflow.py`
+- `audit_db.py`
+- `tests/test_workflow.py`
+- `tests/test_audit_db.py`
+- `docs/v4_state_machine.md`
+
+If the lab requires a missing file, create it at the exact path above. Do not invent a different filename or folder. Do not edit unrelated files unless you explain why and receive approval.
+
+## Implementation requirements
+- Complete only the behavior named in this lab: **understand workflow states and terminal states**.
+- Compare the work with the matching reference file in the starter kit, but explain the code instead of blindly copying it.
+- Keep all existing V1–V3 behavior working.
+- Use only synthetic data and dedicated test accounts/repositories.
+- Never reveal, print, paste into chat, or commit API keys, tokens, passwords, SSH material, browser data, or personal files.
+- Preserve deterministic security authority. AI output may explain or propose only within the version’s documented boundary.
+- Add or update a readable automated test whenever executable behavior changes.
+- Keep the code simple enough to explain line by line.
+
+## Verification commands
+After implementation, run these one at a time and explain each result:
+1. `cd ~/Developer/agentguard-v4`
+2. `source .venv/bin/activate`
+3. `python -m pytest -q tests/test_workflow.py tests/test_audit_db.py`
+
+## Passing criteria
+- pytest reports passed tests and no failed tests for the behavior changed in this lab.
+- You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Finish the lab
+1. Show the exact files changed.
+2. Show the exact test or command output.
+3. Explain what passed, what was not tested, and any live-service step I still need to run manually.
+4. Give me a 3–5 sentence interview explanation connecting this lab to enterprise AI security.
+5. Tell me exactly what screenshot or text evidence to save.
+6. Do not commit, push, create a pull request, spend API money, or run a live external action unless this lab explicitly requires it and I separately approve it.
