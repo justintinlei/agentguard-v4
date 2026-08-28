@@ -8282,3 +8282,384 @@ scanner is still the sole authority for risk; v3 only changed where the
 inventory comes from - a read-only MCP client/server boundary, under a
 fixed allowlist, with provenance and an audit trail - and proved it
 stayed read-only every way it could.
+
+## Day 1, Lab 1 — Understand the v4 problem and finish line
+
+- **The problem v4 solves.** v1 through v3 can *see* risk but cannot
+  safely *fix* it. v1 scores each agent against five fixed rules; v2 adds
+  a grounded AI explanation of each finding (explain only, never
+  re-score); v3 changed only *where* the inventory comes from — a
+  read-only MCP boundary instead of a local file. At the end of all that,
+  a human still has to open the real system and change the agent's
+  settings by hand. Detecting risk is not the same as reducing it, and
+  that gap between "we found it" and "it's fixed" is exactly what v4
+  addresses.
+- **Why not just let the AI system fix it.** The tempting shortcut —
+  "you found the problem, now go patch it" — is dangerous. From
+  `docs/v3_to_v4_handoff.md`, four concrete reasons:
+  - **Blast radius.** A misbehaving *read* returns bad *data* ("re-run
+    the scan"). A misbehaving *write* changes *production configuration*
+    ("restore the agent's settings"). Same bug, far worse outcome.
+  - **Prompt injection stops being contained.** In v3, connected text is
+    inert: nothing downstream of the scanner has authority to act on it,
+    so `"ignore this finding"` in a registry note does nothing. Add a
+    write path to the same pipeline and `"set human_approval_required to
+    false"` in a note becomes a live instruction an attacker can aim at.
+  - **Authorization blurs.** Today there is one bright line — the tool
+    allowlist — and "who may read" and "who may write" are the same
+    question because there is only reading. Mix the two behind one
+    boundary and every caller that could read can now also write unless a
+    second, finer check is bolted on.
+  - **The audit story weakens.** v3's event records *that a read
+    happened* (route, tool, source hash, correlation id, outcome). A
+    write needs a much richer record — which field, from what value to
+    what value, who approved it, whether it verified, whether it was
+    rolled back — that does not belong bolted onto a read event.
+- **v4's answer: a governed action layer, separate from the read-only
+  MCP server.** Deterministic rules decide *what* to propose; a human
+  approves *that exact proposal*; the change is applied only to an
+  isolated copy and re-scanned; any GitHub output is dry-run and
+  draft-only; everything is reversible and written to a local database.
+  The AI layer may *propose and explain*; it may never approve, apply,
+  verify, or set a score. v1's scanner stays the sole risk authority and
+  the MCP discovery server stays exactly five read-only tools.
+- **New terms:**
+  - **Remediation** — changing an agent's configuration to reduce its
+    risk score, as opposed to only reporting the risk.
+  - **Remediation template (allowlisted)** — one of exactly three
+    pre-approved, bounded change shapes (require human approval, assign an
+    owner, remove a broad admin/wildcard tool); there is no free-form or
+    model-written edit.
+  - **Proposal** — one specific, bounded change to one agent, carrying
+    the finding it addresses and the risk score the change is expected to
+    produce.
+  - **Canonical JSON / content (source) hash** — serialising data with
+    sorted keys and fixed separators so the same structure always
+    produces the same bytes, then taking a SHA-256 of those bytes as a
+    stable fingerprint of exactly what was reviewed.
+  - **Exact approval vs. stale approval** — approval is bound to the
+    proposal's hash *and* the source hash; if either the proposal or the
+    source environment changes afterward, the old approval is
+    automatically void and a new human review is required.
+  - **State machine / terminal state** — the fixed, ordered set of
+    stages a remediation moves through
+    (`DISCOVERED → SCANNED → PROPOSED → APPROVED → VERIFIED →
+    DRAFT_PR_CREATED → ROLLED_BACK`), plus the dead-end states
+    `REJECTED` and `FAILED`; skipping a stage is rejected.
+  - **Isolated verification** — applying a proposal to a temporary copy
+    of the environment and re-running the scanner there, so the real
+    source is never touched during checking.
+  - **Dry-run** — printing the exact commands that *would* run while
+    changing nothing; the default mode for the GitHub plan.
+  - **Draft pull request** — a proposed code change opened on GitHub in
+    review state, which cannot be merged automatically and must be
+    reviewed by a person.
+  - **Rollback** — a stored way to reverse an applied change; v4 also
+    *refuses* to automatically roll back a change that has already been
+    merged, because that would silently rewrite shared history.
+  - **Audit event / SQLite event history** — one durable row written for
+    every state transition (proposed, approved by whom against which
+    hash, applied, verified, rolled back), kept in a local relational
+    database file so a reviewer can reconstruct exactly what happened.
+- **v4's finish line (not yet built).** The same app, still scored only
+  by v1's unchanged deterministic rules, that can: take one of the three
+  allowlisted remediation templates; turn it into an exact proposal and
+  hash both the proposal and the source; store a human approval bound to
+  those hashes; apply the approved, unmodified proposal only in an
+  isolated temporary directory and re-scan to confirm it produced the
+  predicted state; optionally emit a dry-run GitHub plan that at most
+  creates a branch and a draft pull request on a separate synthetic
+  private repository; support rollback of an unmerged draft; and record
+  every transition in a SQLite audit database. The release gate is
+  expected to end `RELEASE GATE PASS for AgentGuard v4`. None of this is
+  implemented yet — this lab only states it.
+- **Input / processing / output / security boundary for this lab.**
+  Input: the existing repository docs plus the v4 starter-kit reference
+  (`docs/v4_architecture.md`, `docs/v4_state_machine.md`,
+  `docs/v4_threat_model.md`). Processing: a human reads and summarises —
+  no code runs. Output: this learning-log entry only. Security boundary:
+  documentation only — no code path, no network call, no model call, no
+  secret read or written, no git commit.
+- **Why this lab exists.** Before writing any action-layer code, the
+  course makes you state, on the record, both the gap v4 fills and the
+  specific dangers of closing it carelessly — so every later v4 lab is
+  measured against an explicit finish line and an explicit list of things
+  the design must never do.
+- **What this lab did not do.** No product code, no MCP change, no new or
+  changed automated test (no executable behavior changed). No edit to
+  `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, or
+  `docs/roadmap.md` — they still describe v3 as shipped and are
+  re-oriented to v4 in a later lab; rewriting `README.md` /
+  `START_HERE.md` now would break `tests/test_docs_consistency.py`. No
+  commit, branch, or tag (that is Day 1, Lab 4).
+
+## Day 1, Lab 2 — Verify how v3 was preserved and v4 inherited the released baseline
+
+- **Verify, don't reproduce.** The lab's default step is
+  `cd ~/Developer/AgentGuard/01-Working && cp -R agentguard-v3 agentguard-v4`,
+  but that copy was already done before this lab, and Lab 1 has already
+  added work on top of it. Re-running `cp -R` would either fail (the
+  destination exists) or overwrite the completed Lab 1 entry and the v4
+  course scaffolding. So this lab was entirely read-only verification of
+  a transition that already happened — not a repeat of the copy.
+- **What v4 inherited.** A byte-for-byte copy of the released v1–v3
+  source tree: `scanner.py` (v1's deterministic rules), the MCP layer
+  (`mcp_server.py`, `mcp_client.py`, `mcp_security.py`,
+  `discovery_core.py`, `discovery_adapter.py`), the v2 grounded-analyst
+  layer (`v2_service.py`, `claude_analyst.py`, `mock_analyst.py`,
+  `retrieval.py`, `grounding.py`, `policy_library.py`,
+  `prompt_builder.py`), `audit_log.py`, all three UIs (`app.py`,
+  `app_v2.py`, `app_v3.py`), `requirements.txt`, and — importantly — the
+  entire `tests/` directory unchanged, so the same 230-passing regression
+  baseline carries straight into v4. `policies/`,
+  `connected_environment/`, `evals/`, `scripts/`, `evidence/`, and every
+  `docs/*.md` except the lab index are identical too. Confirmed with
+  `diff -rq agentguard-v3 agentguard-v4` (excluding volatile dirs).
+- **What was deliberately NOT copied, and why.**
+  - **`.git/`** — v4 has its own fresh history
+    (`ff64c41 Start V4 from verified AgentGuard V3 baseline`, then
+    `f813e24 Add V4 course prompts and lab index`); none of v3's commit
+    IDs appear in it. Each version keeps a separate history, its own
+    baseline commit, and its own tag, so a mistake made building v4 can
+    never rewrite v3's verified history.
+  - **`.venv/`** — a per-project virtual environment. Kept separate so a
+    dependency change in v4 (e.g. adding a GitHub or SQLite library)
+    can't leak into or break the frozen v3.
+  - **`.env` / any secret** — absent in both folders (only
+    `.env.example` is present). A secret must never travel with a copy;
+    `.gitignore` also blocks `.env` and `.env.*`.
+  - **caches and runtime logs** — `__pycache__/`, `.pytest_cache/`,
+    `*.jsonl` (the `audit_events.jsonl` runtime log differs between the
+    two folders, but it is git-ignored and regenerated, so it is not part
+    of the source baseline), `.DS_Store`.
+- **What was intentionally changed for v4.** `docs/lab_execution_index.md`
+  now holds the v4 lab map, and the 80 files in `prompts/course_labs/`
+  were replaced with the v4 course prompts (both already committed as
+  `f813e24`). Lab 1 appended its learning-log entry. These intentional
+  differences are exactly why v4 is *not* meant to be byte-identical to
+  v3 — so "make it match v3" is the wrong instinct here.
+- **Why v3 must stay frozen and restorable.** v3 is committed clean and
+  tagged `v3.0.0` — the last fully verified state (release gate pass, 230
+  tests, v2 evaluation matrix, v3's six-category security suite, secret
+  scan). If v4 work ever needs a known-good baseline to diff against or
+  fall back to, that only works if v3's folder, git history, and `.venv`
+  are never touched by v4 work. The v3→v4 handoff named "v3 tagged as a
+  restorable checkpoint" as a precondition; the `v3.0.0` tag satisfies
+  it.
+- **"Preserve the read-only integration as the trusted discovery
+  baseline."** v3's read-only MCP boundary — exactly five discovery
+  tools, a fixed file allowlist, a SHA-256 provenance hash and
+  correlation ID on every response, and an audit event per request — is
+  the *input surface* that v4's remediation layer will sit on top of. v4
+  adds a governed *action* path (propose → approve → verify → draft PR →
+  rollback → audit); it must not add a write tool to that server, widen
+  the allowlist, or weaken provenance/audit. Inheriting v3 intact is what
+  makes that boundary a dependable foundation rather than something to
+  re-argue.
+- **New terms:**
+  - **Released baseline** — the last fully verified, gate-passing state
+    of the previous version, used as the starting point for the next.
+  - **Frozen** — deliberately no longer edited, so it stays a
+    trustworthy comparison point and fallback.
+  - **Git tag (`v3.0.0`)** — a permanent, human-named pointer to one
+    specific commit, so that exact state can always be checked out again.
+  - **Byte-for-byte identical** — files match exactly, character for
+    character; verifiable with `diff`.
+  - **Environment-specific / private files** — files that belong to one
+    machine or checkout (`.venv`, `.env`, caches, `.DS_Store`), not to
+    the shared source, and so are excluded from copies and from git.
+  - **Working tree** — the current on-disk files, as opposed to what git
+    has committed; `git status` compares the two.
+  - **Regression baseline** — the recorded "everything passed here"
+    state (230 tests) that later changes are checked against.
+- **Input / processing / output / security boundary for this lab.**
+  Input: the current on-disk state of `agentguard-v3` and
+  `agentguard-v4`. Processing: read-only comparison only —
+  `diff -rq`, `git log`, `git status --short`, `git tag`. Output: this
+  learning-log entry. Security boundary: no `cp`, no file creation or
+  deletion, no code change, no network call, no secret, no git commit;
+  both project folders left exactly as found (except this appended
+  entry).
+- **Unexpected difference noted, not "fixed".** `git status` in v4 shows
+  `prompts/course_labs/day01_lab02_...v4-folder.txt` as modified — that
+  is the CURRENT-STATE OVERRIDE preamble the user added to this lab's own
+  prompt file. Recognised as user-authored and left untouched; it is not
+  a baseline defect.
+- **Why this lab exists.** Building a new version safely depends on
+  starting from a known-good copy *and* knowing precisely what did and
+  didn't come across. This lab makes that explicit: v4's source is the
+  verified v3 source, v3 stays independently restorable at `v3.0.0`, and
+  the only intended divergences are the v4 course scaffolding plus the
+  work each v4 lab adds.
+- **What this lab did not do.** No `cp -R`, no recreate/delete/
+  reinitialize of either project, no product or test code change, no
+  edit to `README.md` / `START_HERE.md` / `VERSION.txt` / `CLAUDE.md` /
+  `docs/roadmap.md`, no commit, branch, or tag (that is Day 1, Lab 4).
+
+## Day 1, Lab 3 — Open the v4 project in all working tools
+
+- **Five kinds of tool, one job each, same folder.** Every tool points
+  at the one `agentguard-v4` folder and none of them overlaps in
+  responsibility. The separation is itself a security control: no single
+  tool — the AI assistant included — can both write a change and ship it.
+  - **Code (the editor + Claude Code).** The editor (Cursor or similar)
+    is for reading and changing source: syntax highlighting,
+    search-across-files, inline diffs. Claude Code is an AI
+    pair-programmer running inside the terminal session — it reads files
+    and proposes edits or commands, but every state-changing action still
+    needs my approval and still runs through the terminal or editor, not
+    around them.
+  - **Terminal.** The most literal, lowest-level way to act on the
+    project: `source .venv/bin/activate`, `pytest -q`,
+    `python scripts/run_release_gate.py`, `git …`, and — once later labs
+    install them — `gh …` (GitHub CLI) and `docker …`.
+  - **Browser (Chrome).** Where the running product is actually seen:
+    the Streamlit app (`app_v3.py` today, `app_v4.py` later) served at
+    `http://localhost:8501`, and later the GitHub repository and
+    pull-request pages. It is a pure viewer — it never touches the
+    filesystem or git history.
+  - **GitHub.** New emphasis for v4. Used two ways: (1) Continuous
+    integration — `.github/workflows/tests.yml` re-runs the test suite
+    and the evaluation suites automatically on every push and pull
+    request, so a break is caught off my machine; (2) the remediation
+    output itself — v4 produces a **draft pull request** on a *separate,
+    private, synthetic demo repository*, never the AgentGuard source repo
+    and never a production system. The `gh` CLI (installed Day 2) signs
+    in through a browser OAuth flow, so no token is ever written into a
+    project file.
+  - **Docker.** Packaging the finished app as a container image so it
+    runs the same on any machine regardless of what Python or libraries
+    are installed there. `Dockerfile`, `.dockerignore`, and
+    `compose.yaml` are created on Day 9; `.dockerignore` is what keeps
+    `.env` and other secrets out of the built image.
+- **What is installed now vs. later.** Editor, Terminal, `.venv`, `git`,
+  and Node.js (`v26.7.0`, left over from v3's MCP Inspector work) are
+  present now. `gh` is **not** installed yet — Day 2, Lab 2. `docker` is
+  **not** installed yet — Day 9, Lab 5. There is no git remote configured
+  yet either. Noting this so that a "command not found" for `gh` or
+  `docker` before those labs is expected, not a failure.
+- **How this differs from v3's tool list.** v3's version of this lab
+  treated GitHub as a place to *view* commit history (via GitHub
+  Desktop). In v4, GitHub becomes the mechanism that separates a
+  *proposed* change from an *applied* one — a draft PR that a human must
+  review and CI that must pass — and Docker is added so the packaged
+  product is reproducible. Both are extra human-visible seams, not
+  shortcuts.
+- **New terms:**
+  - **IDE** — an editor (like Cursor) bundling file editing, search, and
+    often a terminal into one application.
+  - **CLI** — a command-line program, driven by typed commands rather
+    than a clickable interface.
+  - **`gh` (GitHub CLI)** — GitHub's official command-line tool for
+    repos, branches, and pull requests.
+  - **OAuth / browser login** — authorising a tool by approving it in a
+    browser prompt, so the tool gets a scoped credential and no token is
+    pasted into a file.
+  - **Remote** — a named link (usually `origin`) to a copy of the repo
+    hosted elsewhere, e.g. on GitHub.
+  - **Pull request (PR)** — a proposed set of commits submitted for
+    review before being merged into the main branch.
+  - **Draft pull request** — a PR explicitly marked not-ready; it cannot
+    be merged until taken out of draft, so it always starts in review
+    state.
+  - **CI (continuous integration)** — automatically building and testing
+    the code on every push, on a neutral machine.
+  - **GitHub Actions** — GitHub's built-in CI runner.
+  - **Workflow file** — a `.github/workflows/*.yml` file describing what
+    CI should run (`tests.yml` here).
+  - **Container** — an isolated, packaged run of an application with its
+    own dependencies.
+  - **Image** — the built, shippable template a container is started
+    from.
+  - **`Dockerfile`** — the build recipe for an image.
+  - **`.dockerignore`** — the list of paths excluded from the image
+    build context; keeps secrets and caches out.
+  - **`compose.yaml`** — a file defining how to run one or more
+    containers together (ports, environment, volumes).
+- **Input / processing / output / security boundary for this lab.**
+  Input: the existing repository plus the v4 course's tool list.
+  Processing: a human maps each tool to its single responsibility and
+  checks what is installed now versus later. Output: this learning-log
+  entry. Security boundary: nothing installed, nothing authenticated, no
+  remote added, no container built, no network call, no secret touched,
+  no git commit.
+- **Why this lab exists.** Fixing in writing which tool does what —
+  before any v4 code — means the later labs that add a GitHub login,
+  draft pull requests, and a Docker build slot into an already-understood
+  division of responsibility instead of expanding what any one tool is
+  trusted to do.
+- **What this lab did not do.** Installed nothing, configured nothing,
+  authenticated nothing, added no remote, built no container. No edit to
+  `README.md` / `START_HERE.md` / `VERSION.txt` / `CLAUDE.md` /
+  `docs/roadmap.md`. No commit, branch, or tag (that is Day 1, Lab 4).
+
+## Day 1, Lab 4 — Create the v4 branch and baseline commit
+
+- **The idea.** A commit is a permanent, timestamped snapshot of the
+  tracked files at one point in time; a branch is a named pointer to a
+  line of commits. Creating a branch before starting experimental work
+  means that work happens on its own line of history — the branch it
+  started from (`main`) never changes underneath it, so it stays a clean
+  place to return to.
+- **"Isolate action-layer changes."** v4's new code is the *action
+  layer* — the first part of AgentGuard that can *change* an agent's
+  configuration instead of only reading and scoring it:
+  `remediation_templates.py` (the three allowlisted change shapes),
+  `approval.py` and `proposal_hash.py` (human approval bound to a hash),
+  `verifier.py` (isolated re-scan), `github_plan.py` (dry-run branch/PR
+  commands), `rollback.py`, `workflow.py` (the state machine), and
+  `audit_db.py` (the SQLite event log). None of these exist yet. Putting
+  them on `v4-development` matters more than it did for v3's read-only
+  work: a bug in read-only discovery returns bad data, but a bug in the
+  action layer could alter a (synthetic) configuration, so the
+  known-good fallback has to be one command away —
+  `git checkout main`.
+- **What was done.** Created branch `v4-development` off `main`, then
+  committed the Day 1 orientation work as the baseline commit:
+  `notes/learning_log.md` (the Day 1 Lab 1–4 entries) plus the three
+  Day 1 prompt files that were adjusted for this environment
+  (`prompts/course_labs/day01_lab02…`, `day01_lab03…`, `day01_lab04…` —
+  a project-path correction, and the Lab 2 current-state override note).
+  Commit message: `Complete Day 1 setup: V4 orientation and prompt
+  adjustments`. `main` still points at `f813e24` — untouched — and no
+  tag or push was made.
+- **What is deliberately NOT in this commit.** `README.md`,
+  `START_HERE.md`, `VERSION.txt`, and `docs/roadmap.md` still describe v3
+  as shipped. v2 and v3 flipped those strings during their Day 1; this v4
+  run is keeping them until a later lab (a full-doc re-orientation would
+  break `tests/test_docs_consistency.py`, which still asserts v3
+  language). So the baseline commit records exactly what Day 1 produced —
+  the learning log and the prompt adjustments — and nothing it did not.
+- **New terms:**
+  - **Commit** — a permanent snapshot of the staged files plus a message.
+  - **Branch** — a movable pointer to a commit; commits on one branch
+    don't affect any other.
+  - **Staging** — choosing exactly which changed files go into the next
+    commit (`git add <path>`), rather than committing everything.
+  - **Baseline commit** — a checkpoint marking "this known state is
+    complete/verified," used as a restore point before riskier work.
+  - **`HEAD`** — the pointer to the commit (and branch) you currently
+    have checked out.
+  - **`git checkout -b <name>`** — create a new branch and switch to it
+    in one step.
+  - **Working tree clean** — no uncommitted changes; `git status` shows
+    nothing.
+  - **Feature branch** — a branch holding one coherent body of new work
+    (here, the whole v4 action layer), kept off `main` until it is ready.
+- **Input / processing / output / security boundary.** Input: the four
+  uncommitted Day 1 working-tree changes. Processing: `git checkout -b`,
+  `git add` for the four named files, `git commit`. Output: one new
+  commit on the new `v4-development` branch. Security boundary: local git
+  only — no `git push`, no remote, no pull request, no tag, no network,
+  no secret. The commit contents are documentation and prompt text; there
+  is no `.env`, key, or credential in it, and the learning-log changes
+  are purely additive.
+- **Why this lab exists.** Day 2 onward starts writing code that can
+  change things. Recording the pre-action-layer state as a labelled,
+  restorable checkpoint now means any later mistake can be undone with
+  `git checkout main` or a branch reset, instead of trying to reconstruct
+  by hand which edits to reverse.
+- **What this lab did not do.** No `git push`, no remote, no pull
+  request, no tag. No edit to `README.md` / `START_HERE.md` /
+  `VERSION.txt` / `CLAUDE.md` / `docs/roadmap.md`. No product or test
+  code, and no new automated test (no executable behaviour changed).

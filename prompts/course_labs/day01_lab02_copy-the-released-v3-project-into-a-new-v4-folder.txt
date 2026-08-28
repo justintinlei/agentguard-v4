@@ -1,6 +1,36 @@
+IMPORTANT CURRENT-STATE OVERRIDE FOR DAY 1 LAB 2:
+
+The V3-to-V4 baseline copy has already been completed before this lab.
+
+The current V4 project already exists at:
+~/Developer/AgentGuard/01-Working/agentguard-v4
+
+The frozen V3 source project is:
+~/Developer/AgentGuard/01-Working/agentguard-v3
+
+Do NOT repeat the manual's `cp -R` operation.
+Do NOT recreate, delete, overwrite, or reinitialize the V4 project.
+Do NOT copy V3's `.git`, `.venv`, `.env`, caches, or other environment-specific/private files into V4.
+Do NOT replace the V4 `prompts/course_labs/` prompt set or `docs/lab_execution_index.md` with the V3 versions.
+Do NOT undo completed Day 1 Lab 1 work.
+
+Treat this Lab 2 as a verification-and-learning lab:
+1. Inspect the existing V3 and V4 project state.
+2. Verify that V4 inherited the required released V1-V3 source baseline.
+3. Explain what should and should not be copied when creating a new version.
+4. Identify any unexpected baseline difference, but stop and ask before changing anything.
+5. Do not modify files merely to make V4 byte-for-byte identical to V3, because intentional V4 course-scaffolding and completed Lab 1 changes already exist.
+6. Present a short numbered plan and stop for my approval before making any change.
+
+Use read-only inspection commands first. If the inherited baseline is already correct, the only Lab 2 content change I expect is an appropriate append-only learning-log entry, unless you identify a real problem and I separately approve a fix.
+
+Preserve the currently passing V1-V3 regression baseline and stay entirely inside the two AgentGuard project folders named above.
+
+
+
 I am a beginner completing AgentGuard v4, Day 1, Lab 2: Copy The Released V3 Project Into A New V4 Folder.
 
-Read `CLAUDE.md`, `docs/lab_execution_index.md`, and the current repository before changing anything. Stay inside `~/Developer/agentguard-v4`.
+Read `CLAUDE.md`, `docs/lab_execution_index.md`, and the current repository before changing anything. Stay inside `~/Developer/AgentGuard/01-Working/agentguard-v4`.
 
 ## Learning goal
 how to preserve the read-only integration as the trusted discovery baseline
@@ -33,7 +63,7 @@ If the lab requires a missing file, create it at the exact path above. Do not in
 
 ## Verification commands
 After implementation, run these one at a time and explain each result:
-1. `cd ~/Developer`
+1. `cd ~/Developer/AgentGuard/01-Working`
 2. `cp -R agentguard-v3 agentguard-v4`
 3. `cd agentguard-v4`
 4. `pwd`
