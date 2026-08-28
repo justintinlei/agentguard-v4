@@ -1,0 +1,7 @@
+{
+  "owners": [
+    {"agent_name": "Customer Support Agent", "owner": "Customer Support Operations"},
+    {"agent_name": "Research Agent", "owner": "Product Research"},
+    {"agent_name": "Deployment Agent", "owner": "Platform Engineering"}
+  ]
+}

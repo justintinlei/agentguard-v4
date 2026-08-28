@@ -1,0 +1,186 @@
+I am a beginner completing AgentGuard v3, Day 1, Lab 2: Copy The Released V2 Project Into A New V3 Folder.
+
+Read `CLAUDE.md`, `docs/lab_execution_index.md`, and the current repository before changing anything. Stay inside `~/Developer/AgentGuard/01-Working/agentguard-v3`.
+
+## Learning goal
+how to preserve the grounded analyst while creating a new integration release
+
+## Before any change
+1. Explain the concept in plain English and define every new technical term.
+2. Explain the input, processing, output, and security boundary for this lab.
+3. Inspect the files below and tell me whether each already exists.
+4. Present a short numbered plan and stop for my approval.
+
+## Exact relevant paths
+- `notes/learning_log.md`
+- `README.md`
+- `START_HERE.md`
+- `VERSION.txt`
+- `CLAUDE.md`
+- `docs/roadmap.md`
+
+If the lab requires a missing file, create it at the exact path above. Do not invent a different filename or folder. Do not edit unrelated files unless you explain why and receive approval.
+
+## Implementation requirements
+- Complete only the behavior named in this lab: **copy the released v2 project into a new v3 folder**.
+- Compare the work with the matching reference file in the starter kit, but explain the code instead of blindly copying it.
+- Keep all existing V1–V2 behavior working.
+- Use only synthetic data and dedicated test accounts/repositories.
+- Never reveal, print, paste into chat, or commit API keys, tokens, passwords, SSH material, browser data, or personal files.
+- Preserve deterministic security authority. AI output may explain or propose only within the version’s documented boundary.
+- Add or update a readable automated test whenever executable behavior changes.
+- Keep the code simple enough to explain line by line.
+
+## Verification commands
+After implementation, run these one at a time and explain each result:
+1. `cd ~/Developer`
+2. `cp -R agentguard-v2 agentguard-v3`
+3. `cd agentguard-v3`
+4. `pwd`
+
+## Passing criteria
+- The named files exist in the exact paths, the command completes without an unhandled error, and git shows only the expected changes.
+- You can explain the input, processing, output, safety boundary, and reason this lab exists.
+
+## Finish the lab
+1. Show the exact files changed.
+2. Show the exact test or command output.
+3. Explain what passed, what was not tested, and any live-service step I still need to run manually.
+4. Give me a 3–5 sentence interview explanation connecting this lab to enterprise AI security.
+5. Tell me exactly what screenshot or text evidence to save.
+6. Do not commit, push, create a pull request, spend API money, or run a live external action unless this lab explicitly requires it and I separately approve it.
+
+
+AgentGuard V3 Day 1 Lab 2 — Existing-Baseline Override
+
+IMPORTANT: The physical V2-to-V3 copy/setup described by this lab has already been completed successfully before I began working through the V3 manual.
+
+Do not repeat the copy operation.
+
+Actual locations
+
+Frozen V2:
+
+~/Developer/AgentGuard/01-Working/agentguard-v2
+
+Working V3:
+
+~/Developer/AgentGuard/01-Working/agentguard-v3
+
+Golden Reference:
+
+~/Developer/AgentGuard/00-Golden-Reference/Starter-Kits
+
+The Golden Reference is read-only.
+
+Current verified V3 result
+
+The intended outcome of the copy/setup portion of this lab already exists:
+
+V3 is a separate project at the correct path.
+V2 remains separate and frozen.
+V3 branch is main.
+V3 baseline commit is:
+84f249e Start V3 from verified AgentGuard V2 baseline
+V3 has its own fresh .venv.
+Python resolves to the V3 virtual environment.
+No V2 .env was copied into V3.
+Git was clean before beginning the V3 labs.
+The inherited V2 baseline inside V3 has already passed:
+52 tests
+V2 evaluations 3/3
+full regression/evaluation matrix
+secret check
+release gate
+setup verifier
+Critical safety override
+
+DO NOT execute:
+
+cp -R agentguard-v2 agentguard-v3
+
+or any equivalent copy command.
+
+Also do not:
+
+delete or recreate agentguard-v3;
+overwrite the existing V3 directory;
+modify the frozen V2 repository;
+copy V2's .git state over the current V3 Git repository;
+copy V2's .venv;
+copy any .env;
+reset or rewrite V3 Git history;
+recreate the existing baseline commit;
+checkout or modify V2;
+copy the complete final V3 starter kit over the working repository.
+
+The copy step has already happened. Treat this lab as verification and learning, not as permission to reproduce a potentially destructive filesystem operation.
+
+Adapted Lab 2 learning goal
+
+Teach me how the already-completed transition preserved the grounded V2 analyst while establishing a separate V3 integration release.
+
+Verify the result rather than reproducing it.
+
+Before any modification:
+
+Confirm the current directory is:
+~/Developer/AgentGuard/01-Working/agentguard-v3
+Inspect the repository only as needed.
+Verify:
+current branch;
+latest commit;
+clean/expected Git status;
+V3 Python executable location;
+absence of a project-root .env without displaying any secret contents.
+Explain why a separate V3 repository and virtual environment are useful boundaries.
+Explain why V2 must remain restorable and untouched.
+Explain which V1/V2 security invariants V3 must preserve.
+Present a short numbered plan.
+Stop for my approval.
+
+Safe verification commands may include:
+
+pwd
+
+git branch --show-current
+
+git log -1 --oneline
+
+git status --short
+
+python -c "import sys; print(sys.executable)"
+
+You may verify whether .env exists, but do not open, display, print, search, or expose its contents.
+
+Do not rerun the full V2 regression/release gate in this lab merely because it was previously run. Day 1 Lab 5 is the manual's dedicated regression-gate lab.
+
+Changes during this adapted Lab 2
+
+Prefer verification and explanation over repository changes.
+
+Do not modify executable source code.
+
+If a learning-log update or narrowly scoped Lab 2 documentation update is appropriate, explain exactly why and obtain approval first.
+
+Do not update files merely to make them byte-for-byte identical to the final V3 starter kit.
+
+Working method
+
+Use:
+
+Plan → review plan → my explicit acceptance → Manual → independent verification
+
+Do not commit or push.
+
+At completion, report:
+
+what was already completed before this lab;
+what you verified during this lab;
+commands run and results;
+exact files changed, if any;
+git status --short;
+git diff --name-only;
+what evidence I should save;
+why the verified transition preserves V2 while giving V3 a safe independent starting point.
+

@@ -1,0 +1,29 @@
+[
+  {
+    "case_id": "V2-001",
+    "agent_index": 0,
+    "expected_level": "HIGH",
+    "must_cite": true,
+    "relevance_reviewed": null,
+    "completeness_reviewed": null,
+    "reviewer_notes": ""
+  },
+  {
+    "case_id": "V2-002",
+    "agent_index": 1,
+    "expected_level": "NO RISK FOUND",
+    "must_cite": true,
+    "relevance_reviewed": null,
+    "completeness_reviewed": null,
+    "reviewer_notes": ""
+  },
+  {
+    "case_id": "V2-003",
+    "agent_index": 2,
+    "expected_level": "HIGH",
+    "must_cite": true,
+    "relevance_reviewed": null,
+    "completeness_reviewed": null,
+    "reviewer_notes": ""
+  }
+]

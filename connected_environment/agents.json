@@ -1,0 +1,30 @@
+{
+  "environment_name": "AgentGuard Connected Demo Environment",
+  "source_system": "synthetic-agent-registry",
+  "agents": [
+    {
+      "agent_name": "Customer Support Agent",
+      "owner": "",
+      "identity": "support-agent-prod",
+      "tools": ["read_ticket", "send_email", "delete_customer_record"],
+      "sensitive_data_access": true,
+      "human_approval_required": false
+    },
+    {
+      "agent_name": "Research Agent",
+      "owner": "Product Research",
+      "identity": "research-agent-readonly",
+      "tools": ["web_search", "read_public_document"],
+      "sensitive_data_access": false,
+      "human_approval_required": false
+    },
+    {
+      "agent_name": "Deployment Agent",
+      "owner": "Platform Engineering",
+      "identity": "deployment-agent-prod",
+      "tools": ["read_repository", "deploy_production", "rollback_deployment"],
+      "sensitive_data_access": true,
+      "human_approval_required": false
+    }
+  ]
+}

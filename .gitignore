@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.DS_Store
+*.pyc
+*.bak
+.env
+.env.*
+!.env.example
+*.jsonl
+evidence/*.png
+evidence/*.pdf
+.claude/

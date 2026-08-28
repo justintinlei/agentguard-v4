@@ -1,0 +1,12 @@
+{
+  "tools": [
+    {"name": "read_ticket", "access": "read", "system": "support"},
+    {"name": "send_email", "access": "external_write", "system": "email"},
+    {"name": "delete_customer_record", "access": "destructive", "system": "crm"},
+    {"name": "web_search", "access": "read", "system": "internet"},
+    {"name": "read_public_document", "access": "read", "system": "documents"},
+    {"name": "read_repository", "access": "read", "system": "source_control"},
+    {"name": "deploy_production", "access": "production_write", "system": "deployment"},
+    {"name": "rollback_deployment", "access": "production_write", "system": "deployment"}
+  ]
+}
