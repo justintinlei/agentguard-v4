@@ -1,36 +1,38 @@
 """AgentGuard v4 - Governed Remediation MVP. Streamlit page.
 
-Slices so far:
+This page provides, top to bottom:
 
-  - Day 2, Lab 3: the safety boundary the whole v4 workflow runs under
-    (BOUNDARY_NOTES) and a "GitHub CLI authentication" panel.
-  - Day 9, Lab 1: JOURNEY_STAGES - a read-only MAP of the six stages a
-    remediation passes through, in order, with who holds authority at
-    each one.
-  - Day 9, Lab 2: the first interactive controls - pick one agent and
-    one allowlisted template, click "Build proposal", and see the
-    resulting RemediationProposal and its SHA-256. build_ui_proposal()
-    is the pure helper behind the button.
-  - Day 9, Lab 3: "Approve & verify" - enter a reviewer + reason, choose
-    APPROVE / REJECT, and see the invisible control evidence made
-    visible: the two content hashes the approval is bound to, the
-    ApprovalRecord, the VerificationResult checklist, and an ordered
-    event timeline. approve_and_verify() is the pure helper.
-  - Day 9, Lab 4: for a VERIFIED run only, show the GitHub dry-run plan -
-    the exact five git/gh commands a live run would execute, their
-    DRY_RUN status, and GITHUB_SAFETY_WARNINGS. github_dry_run_plan() is
-    the pure helper. The page runs none of the commands - it is a review
-    surface, not a trigger.
+  - the safety boundary the whole v4 workflow runs under (BOUNDARY_NOTES)
+    and a "GitHub CLI authentication" panel;
+  - JOURNEY_STAGES - a read-only MAP of the six stages a remediation
+    passes through, in order, with who holds authority at each one;
+  - the proposal controls - pick one agent and one allowlisted template,
+    click "Build proposal", and see the resulting RemediationProposal
+    and its SHA-256. build_ui_proposal() is the pure helper behind it;
+  - "Approve & verify" - enter a reviewer + reason, choose APPROVE /
+    REJECT, and see the invisible control evidence made visible: the two
+    content hashes the approval is bound to, the ApprovalRecord, the
+    VerificationResult checklist, and an ordered event timeline.
+    approve_and_verify() is the pure helper;
+  - for a VERIFIED run only, the GitHub dry-run plan - the exact five
+    git/gh commands a live run would execute, their DRY_RUN status, and
+    GITHUB_SAFETY_WARNINGS. github_dry_run_plan() is the pure helper.
+    The page runs none of the commands - it is a review surface, not a
+    trigger.
 
 The auth panel demonstrates a key point: the app can confirm that GitHub
 access works *without ever holding a credential itself*. It shells out to
 `gh auth status` and reads the summary text; the OAuth token that `gh`
-obtained through the browser lives in `~/.config/gh/`, outside this repo,
+obtained through the browser lives in the OS keyring, outside this repo,
 and is never read, displayed, or stored by AgentGuard.
 
-Live GitHub execution is a separate command-line opt-in (Day 10 Lab 3);
-this page never runs it. The durable SQLite audit trail is wired with
-`v4_service` on Day 10. `v4_service` / `audit_db` are not imported here.
+Live GitHub execution is a separate, deliberate command-line step; this
+page never runs it. The page's event timeline is held in memory for
+display; the durable SQLite audit trail (`audit_db.py`,
+`workflow.record_terminal_state`) is exercised by the tests and evals
+directly, and wiring it into this page is a documented post-MVP item
+(`docs/post_mvp_backlog.md`). `v4_service` / `audit_db` are not imported
+here.
 
 Import-safe: render() only runs under `streamlit run app_v4.py` (the
 `__main__` guard). A plain `import app_v4` (the tests) just reads the
@@ -76,27 +78,27 @@ GITHUB_SAFETY_WARNINGS = (
     "The target is the dedicated private synthetic demo repository only - "
     "never a production repository.",
     "Live execution is a separate, deliberate opt-in run from the command "
-    "line (Day 10 Lab 3). This page can never run it.",
+    "line. This page can never run it.",
 )
 
 # Stated on the page so a viewer sees the limits before anything else. Every
-# item here is a commitment the rest of the course enforces in code; see
-# docs/v4_github_demo_setup.md and the Day 1 no-production pledge in
+# item here is a commitment the codebase enforces; see
+# docs/v4_github_demo_setup.md and the no-production pledge in
 # evidence/README.md.
 BOUNDARY_NOTES = (
-    "Training demo - synthetic agent data only, no real account or registry.",
+    "Synthetic demo - synthetic agent data only, no real account or registry.",
     "GitHub execution is dry-run by default and only ever produces a "
     "draft pull request on a dedicated demo repository - never a "
     "production repository, and never a merge.",
-    "No GitHub token is stored in this project. `gh` holds it in "
-    "`~/.config/gh/`; this app only reads `gh auth status`.",
+    "No GitHub token is stored in this project. `gh` holds it in the OS "
+    "keyring; this app only reads `gh auth status`.",
     "v1's scanner.py stays the sole authority for the risk score - a "
     "proposal predicts a score, it never sets one.",
 )
 
 # The six stages a remediation passes through, in order. This is the
-# read-only MAP shown on the page (Day 9 Lab 1); Labs 2-4 add the controls
-# that walk a user through it. Each stage names what the user does, what
+# read-only MAP shown on the page; the controls below walk a user through
+# it. Each stage names what the user does, what
 # the system produces, and - the point of the map - who holds authority
 # there. The `state` field ties each stage back to workflow.STATES so the
 # map cannot drift from the state machine.
@@ -209,7 +211,7 @@ def github_auth_status() -> dict:
     }
 
 
-# --- Day 9 Lab 2: the proposal controls ----------------------------------
+# --- the proposal controls ----------------------------------------------
 
 
 def load_environment() -> dict:

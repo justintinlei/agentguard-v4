@@ -1,12 +1,11 @@
 # AgentGuard v4 — GitHub Demo Setup
 
-**Status: design + setup, in progress across Day 2.** This document is the plan
-and the safety contract for the GitHub side of v4's remediation demo. The code
-that *enforces* the allowlist and the dry-run / draft-only rules
-(`github_plan.py` and its tests) is built on Day 7; until then this is the agreed
-design. All setup steps that touch a live GitHub account (installing `gh`,
-authenticating, creating the repo, opening a PR) are run by the user on their own
-machine with a dedicated test account, one per lab.
+**Status: as built.** This document is the setup guide and the safety contract
+for the GitHub side of v4's remediation workflow. The code that *enforces* the
+allowlist and the dry-run / draft-only rules is `github_plan.py` and its tests.
+Every step that touches a live GitHub account (installing `gh`, authenticating,
+creating the repository, opening a pull request) is run by the operator on their
+own machine with a dedicated test account.
 
 ## The five terms, in plain English
 
@@ -46,37 +45,37 @@ on GitHub — a draft PR on a branch. The only thing that ever *applies* it is a
 **human clicking merge**. There is no merge command anywhere in v4's code, and
 the PR is created as a draft so it cannot merge itself even by accident.
 
-## The v4 demo setup (what Day 2 builds)
+## Setup
 
-| Step | Lab | What it does | Safety point |
-|---|---|---|---|
-| Install `gh` | Day 2 Lab 2 | `brew install gh`; `gh --version` | The GitHub CLI is the only tool that talks to GitHub — a narrow, auditable surface |
-| &nbsp; | &nbsp; | **Done:** `gh version 2.98.0 (2026-08-20)`, installed at `/opt/homebrew/bin/gh`. Version checked only; `gh auth status` reports "not logged into any GitHub hosts" — authentication is Lab 3. | &nbsp; |
-| Authenticate | Day 2 Lab 3 | `gh auth login` through the **browser (OAuth)** | The token is stored by `gh` **outside this repo** — never pasted into a file, never committed |
-| &nbsp; | &nbsp; | **Done:** logged in to `github.com` as `justintinlei`, HTTPS, token scopes `gist, read:org, repo, workflow`. The token is held in the **macOS keyring** (not even a file), reported by `gh auth status` as `gho_************`. No token value is recorded here or anywhere in the repo. | &nbsp; |
-| Create the demo repo | Day 2 Lab 4 | A **new private repository** containing only synthetic files | Never the AgentGuard source repo, never a production repo |
-| &nbsp; | &nbsp; | **Done:** `justintinlei/agentguard-remediation-demo` — private, default branch `main`, one README commit, no other content yet. `https://github.com/justintinlei/agentguard-remediation-demo`. Synthetic agent data is added in Lab 5. | &nbsp; |
-| Clone it | Day 2 Lab 5 | Clone to a **sibling directory** (e.g. `~/Developer/AgentGuard/01-Working/agentguard-remediation-demo`), **never inside this repo** | Keeps the two git histories completely separate; nothing to add to this repo's `.gitignore` |
-| &nbsp; | &nbsp; | **Done:** cloned to `~/Developer/AgentGuard/01-Working/agentguard-remediation-demo` (sibling). Added `connected_environment/agents.json` — the synthetic 3-agent registry copied verbatim from this repo (empty owner, no human approval, broad admin tools = the fixable before-state). Pushed to the demo repo's `main` (`e147248`). Still private. | &nbsp; |
-| PR template + branch rule | Day 2 Lab 6 | Standard PR metadata and a fixed branch-name prefix | Every proposed change looks the same to a reviewer |
-| &nbsp; | &nbsp; | **Done:** in `github_plan.py`. Branch names must match `^agentguard/[a-z0-9-]{1,60}$` (`github_plan.branch_name`) — so the workflow can never push to `main`. The PR body shape is `github_plan.PR_BODY_TEMPLATE` (labelled fields + a fixed draft / no-merge / synthetic footer), rendered by `github_plan.render_pr_body`; it is written to `.agentguard/pr_body.md` at PR-creation time (Day 7). A repo-level `.github/pull_request_template.md` in the demo repo is optional and can be added when the first real PR is made (Day 10). | &nbsp; |
-| Practice a draft PR | Day 2 Lab 7 | Open one draft PR by hand, then close it | Learn the human workflow before AgentGuard automates it |
-| &nbsp; | &nbsp; | **Done:** branch `agentguard/manual-practice` → one-line edit to `connected_environment/agents.json` (Customer Support Agent `human_approval_required` → `true`) → commit → push → `gh pr create --draft` opened **PR #1** (`isDraft: true`, base `main`). Then `gh pr close 1 --delete-branch` — `state: CLOSED`, `mergedAt: null` (never merged), branch deleted (local + remote). Demo repo `main` unchanged at `e147248`. | &nbsp; |
-| Record the allowlist | Day 2 Lab 8 | Write down the exact `owner/repo`, branch prefix, and target file path as plain configuration | No secret is recorded — `scripts/check_no_secrets.py` must still pass |
+Run once, on the operator's machine, with a dedicated test account:
 
-## The allowlist (recorded — Day 2 Lab 8)
+| Step | What it does | Safety point |
+|---|---|---|
+| Install the GitHub CLI | `brew install gh`; `gh --version` | `gh` is the only tool that talks to GitHub — a narrow, auditable surface |
+| Authenticate | `gh auth login` through the **browser (OAuth)** | The token is stored by `gh` in the OS keyring, **outside this repo** — never pasted into a file, never committed |
+| Create the demo repository | a **new private repository** containing only synthetic files | Never the AgentGuard source repo, never a production repo |
+| Clone it as a sibling | clone next to this repo, **never inside it** (e.g. `../agentguard-remediation-demo`) | Keeps the two git histories completely separate |
+| Add synthetic agent data | copy `connected_environment/agents.json` (the 3-agent before-state: empty owner, no human approval, broad admin tools) and push it to the demo repo's `main` | The fixable synthetic starting point for a remediation demo |
+| Record the allowlist | write the exact `OWNER/REPO`, branch prefix, and target file path as plain configuration (below) | No secret is recorded — `scripts/check_no_secrets.py` stays green |
+
+The branch-naming and PR-body conventions are enforced in code
+(`github_plan.branch_name`, `github_plan.PR_BODY_TEMPLATE` /
+`github_plan.render_pr_body`); a repo-level
+`.github/pull_request_template.md` in the demo repo is optional.
+
+## The allowlist
 
 v4's GitHub step is permitted to touch **exactly**:
 
-| Value | Setting | Recorded |
-|---|---|---|
-| repository | `justintinlei/agentguard-remediation-demo` | Day 2 Lab 4 |
-| branch-name prefix | `agentguard/` — every branch must match `^agentguard/[a-z0-9-]{1,60}$` | Day 2 Lab 6 |
-| target file path | `connected_environment/agents.json` | Day 2 Lab 5 |
+| Value | Setting |
+|---|---|
+| repository | `justintinlei/agentguard-remediation-demo` |
+| branch-name prefix | `agentguard/` — every branch must match `^agentguard/[a-z0-9-]{1,60}$` |
+| target file path | `connected_environment/agents.json` |
 
 Anything outside this list is refused by `github_plan.py`.
 
-### How it is enforced (Day 7 Lab 1)
+### How the allowlist is enforced
 
 `github_plan.py` exposes three validators, each returning the value on
 success and raising `ValueError` otherwise:
@@ -94,10 +93,10 @@ success and raising `ValueError` otherwise:
 The **shape** checks stop command injection (a metacharacter never reaches
 a `git`/`gh` argument); the **value** checks stop wrong-target changes
 (the change can only land in the one synthetic repo, on an `agentguard/`
-branch, in the one synthetic file). The plan generator built across the
-rest of Day 7 calls these validators before it builds any command.
+branch, in the one synthetic file). The plan generator calls these
+validators before it builds any command.
 
-### Blocking unapproved inputs (Day 7 Lab 7)
+### Blocking unapproved inputs
 
 `create_plan(repository, workflow_id, file_path)` validates **every input
 at its own entry**, before it builds a single command token:
@@ -120,7 +119,7 @@ Because of this, every token in every generated command is either a fixed
 literal (`git`, `gh`, `--draft`, …) or one of the validated values (the
 repo, the file, the branch, the title) or `.agentguard/pr_body.md`.
 
-### Guarantees under test (Day 7 Lab 8)
+### Guarantees under test
 
 `tests/test_github_plan.py` proves, over a matrix of plans (not one
 example):
@@ -148,12 +147,12 @@ of them prove *who* you are, so reading them grants no access — they are check
 into version control, in this file, on purpose.
 
 The GitHub **token** is a **secret**: it authenticates you. It is held in the
-macOS keyring by `gh` (Lab 3), never written to a file, an environment variable,
+OS keyring by `gh`, never written to a file, an environment variable,
 or this repo. `scripts/check_no_secrets.py` scans every tracked text file for
 `sk-ant-…`, `github_pat_…`, and `gh{o,p,s,r,u}_…` token shapes on every
 release-gate run, so a committed credential fails the gate immediately.
 
-### The plan object (Day 7 Lab 2)
+### The plan object
 
 A remediation's GitHub step is expressed as a `GitHubPlan` (`github_plan.py`) —
 **data, not an action**:
@@ -168,10 +167,10 @@ A remediation's GitHub step is expressed as a `GitHubPlan` (`github_plan.py`) �
 
 `GitHubPlan` is frozen and validates every field on construction (an invalid
 plan cannot exist). It is produced and reviewed — the dry-run executor prints
-every command — before anything runs. `create_plan()` (Lab 3–4) builds the
-commands; `execute_plan()` (Lab 5–6) runs them, dry-run by default.
+every command — before anything runs. `create_plan()` builds the
+commands; `execute_plan()` runs them, dry-run by default.
 
-### The plan commands (Day 7 Labs 3–4)
+### The plan commands
 
 `create_plan(repository, workflow_id)` fills `commands` with four `git`
 steps and one `gh` step:
@@ -209,7 +208,7 @@ renders it and writes it to `.agentguard/pr_body.md` in that working tree.
 That path is git-ignored in this repo and never `git add`-ed in the demo
 repo, so the generated body lands in neither history.
 
-### Executing the plan (Day 7 Labs 5–6)
+### Executing the plan
 
 `execute_plan(plan)` runs a plan — and **by default it does nothing**.
 With no flag it returns one row per command:
@@ -241,8 +240,8 @@ to act — `create_plan()` merely describes. Properties:
 
 A real live run first calls `github_plan.write_pr_body(<demo-repo working
 tree>, **fields)` to render the `render_pr_body()` output to
-`.agentguard/pr_body.md` (Day 10 Lab 3), then runs the five commands with
-cwd set to that same working tree.
+`.agentguard/pr_body.md`, then runs the five commands with cwd set to that
+same working tree.
 
 ## Standing rules for the GitHub surface
 
@@ -255,7 +254,7 @@ cwd set to that same working tree.
 - **Rollback before merge only** — close the draft PR and delete its branch.
   After a merge, v4 refuses automatic rollback and requires a reviewed revert.
 
-This restates the Day 1 no-production pledge (`evidence/README.md`) for the
-GitHub side specifically. The reasoning for keeping remediation in a separate
-governed workflow — rather than a write tool on the MCP server — is in
+This restates the no-production pledge (`evidence/README.md`) for the GitHub
+side specifically. The reasoning for keeping remediation in a separate governed
+workflow — rather than a write tool on the MCP server — is in
 `docs/v3_to_v4_handoff.md`.

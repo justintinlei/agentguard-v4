@@ -1,14 +1,13 @@
 # AgentGuard v4 Architecture — State Machine and Trust Boundaries
 
-**Status: as built — finalised Day 10 Lab 5.** This document was first drafted on
-Day 1 as a paper design; it has now been reconciled against the implemented code
-(`workflow.py`, `audit_db.py`, `proposal_hash.py`, `approval.py`, `verifier.py`,
-`remediation_templates.py`, `github_plan.py`, `rollback.py`) and their tests,
-built across Days 3–8. Where the Day-1 sketch and the code disagreed, the code
-won — see **How this is verified** at the end. The canonical transition map and
-its enforcement live in [`docs/v4_state_machine.md`](v4_state_machine.md); this
-document adds the per-state *data / authority / gate* view and the trust
-boundaries.
+**Status: as built.** This document began as a design sketch and has been
+reconciled against the implemented code (`workflow.py`, `audit_db.py`,
+`proposal_hash.py`, `approval.py`, `verifier.py`, `remediation_templates.py`,
+`github_plan.py`, `rollback.py`) and its tests. Where the original design and
+the code disagreed, the code won — see **How this is verified** at the end. The
+canonical transition map and its enforcement live in
+[`docs/v4_state_machine.md`](v4_state_machine.md); this document adds the
+per-state *data / authority / gate* view and the trust boundaries.
 
 ## The core question this design answers
 
@@ -27,9 +26,9 @@ and every trust boundary is gated by one named, deterministic check.
 
 ## New terms
 
-See the Day 1 Lab 6 glossary in `notes/learning_log.md` for proposal, diff, hash,
-approval, verification, PR, rollback, audit event. The terms specific to this
-document:
+`docs/v4_state_machine.md` and `docs/v4_threat_model.md` define proposal, hash,
+approval, verification, draft PR, rollback, and audit event in context. The
+terms specific to this document:
 
 - **State** — one named stage of the workflow (`PROPOSED`, `APPROVED`, …). The
   system is in exactly one state at a time for a given remediation.
@@ -105,7 +104,7 @@ Rules that hold across the whole machine (all enforced by
   endings go through `workflow.record_terminal_state()`, which takes the step
   *and* appends the matching audit row (`workflow_rejected` / `workflow_failed`
   / `workflow_rolled_back`). Every legal transition becomes one durable,
-  append-only row in the SQLite `workflow_events` table (Day 5).
+  append-only row in the SQLite `workflow_events` table.
 - **Fail closed.** `REJECTED`, `FAILED`, and `ROLLED_BACK` are terminal; there
   is no "continue anyway".
 
@@ -118,7 +117,7 @@ Rules that hold across the whole machine (all enforced by
 | `PROPOSED` | + one `RemediationProposal`: template id, target agent, exact field edits, the finding it addresses, the **predicted** post-change score, the source hash | May *describe* one bounded change; **cannot apply it**. The AI layer may *explain* the proposal, exactly as v2 explains a finding | The proposal was built from one of the three allowlisted templates; deterministic rules chose *what* to propose; the AI proposed/explained only |
 | `APPROVED` | + an `ApprovalRecord`: reviewer, decision, reason, timestamp, bound to the proposal hash **and** the source hash | Human intent is on record; the system **still cannot touch any real configuration** | A person approved *this exact proposal* against *this exact source*. Approve/reject is an explicit human action |
 | `VERIFIED` | + a `VerificationResult` from applying the approved proposal to an **isolated temp copy** and re-scanning it | Proven that the change produces the predicted state — in isolation, not in production | Every verification check passed: predicted score reached, exactly one target changed, only allowlisted keys changed, data still serialises, HIGH-risk count did not increase |
-| `DRAFT_PR_CREATED` | + branch name and draft-PR URL on the **separate, private, synthetic** demo repository | A *proposed* change now exists on GitHub, in review state, **un-mergeable automatically** | Target repo, branch prefix, and file path are all on the allowlist; the dry-run plan was produced and reviewed; live execution was explicitly opted into (dry-run is the default) |
+| `DRAFT_PR_CREATED` | + the `agentguard/<id>` branch name; a live run additionally surfaces the draft-PR URL that `gh` prints. All on the **separate, private, synthetic** demo repository | A *proposed* change now exists on GitHub, in review state, **un-mergeable automatically** | Target repo, branch prefix, and file path are all on the allowlist; the dry-run plan was produced and reviewed; live execution was explicitly opted into (dry-run is the default) |
 | `ROLLED_BACK` *(terminal)* | + a record of the reversal | None — the draft PR is closed and its branch deleted | Rollback was requested **before merge** (the only exit from `DRAFT_PR_CREATED`). Automatic rollback *after* merge is refused by `rollback_plan(merged=True)` — that needs a deliberate, reviewed `git revert` |
 | `REJECTED` *(terminal)* | Whatever was held when a human rejected the proposal | None | Reachable from `PROPOSED` only |
 | `FAILED` *(terminal)* | Whatever was held when a required check failed (including a withdrawn or stale approval) | None — fail closed | Reachable from every non-terminal state except `DRAFT_PR_CREATED` |

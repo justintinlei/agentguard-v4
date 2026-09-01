@@ -6,8 +6,11 @@ new in v4 — proposes a **bounded, human-approved, verified, auditable
 remediation** and delivers it only as a **draft pull request** on a dedicated
 synthetic repository. It never gives an AI model arbitrary write access.
 
-This is a synthetic training project. No real systems, accounts, credentials, or
-data are involved at any point.
+It is built for a platform or security team evaluating how to let AI assist with
+AI-agent governance **without** handing a probabilistic model authority over risk
+decisions or production changes. It is a self-contained reference
+implementation: all data is synthetic and no real system, account, or credential
+is touched at any point.
 
 ## The problem v4 solves
 
@@ -111,8 +114,8 @@ It runs, fail-fast, in order:
 
 | Step | Command | Result |
 |---|---|---|
-| Course scaffolding + "exactly 5 read-only MCP tools" source check | `scripts/validate_starter_kit.py` | `STARTER KIT VALIDATION PASS: 80 labs` |
-| Every v1 + v2 + v3 + v4 unit test | `python -m pytest -q` | **866 passed** |
+| Repository scaffolding + prompt-file integrity + "exactly 5 read-only MCP tools" source check | `scripts/validate_starter_kit.py` | `STARTER KIT VALIDATION PASS` |
+| Every v1 + v2 + v3 + v4 unit test | `python -m pytest -q` | **874 passed** |
 | v2 evaluation matrix (forced mock mode) | `evals/run_v2_evals.py` | `V2 EVALUATION PASS: 3 of 3 cases passed` |
 | v3 security evaluation suite | `evals/run_v3_evals.py` | `V3 SECURITY EVAL SUITE PASS` (6 threat-model categories) |
 | v4 failure-injection evaluation | `evals/run_v4_evals.py` | `V4 FAILURE-INJECTION EVAL PASS: 10 of 10 checks held (fails closed)` |
@@ -140,8 +143,8 @@ v4 builds on the completed v2 and v3 projects without changing their behavior.
 - **v2** — a grounded Claude explanation layer: it retrieves real policy text,
   asks the model (or a free deterministic mock) for a structured explanation
   with citations, and validates every citation and the reported score before
-  anything is shown. Explains and cites; never sets the score. Shipped tagged
-  `v2.0.0-rc1`. See [`docs/v2_architecture.md`](docs/v2_architecture.md) and
+  anything is shown. Explains and cites; never sets the score. Complete and
+  frozen. See [`docs/v2_architecture.md`](docs/v2_architecture.md) and
   [`docs/v2_threat_model.md`](docs/v2_threat_model.md).
 - **v3** — a read-only MCP (Model Context Protocol) 2.x server/client pair
   (`mcp_server.py` / `mcp_client.py`) that discovers the inventory over STDIO
@@ -157,19 +160,34 @@ v4 builds on the completed v2 and v3 projects without changing their behavior.
 separate governed component so v3's server stays provably read-only forever. The
 reasoning: [`docs/v3_to_v4_handoff.md`](docs/v3_to_v4_handoff.md).
 
+## Limitations
+
+Stated openly; full detail in
+[`docs/v4_threat_model.md`](docs/v4_threat_model.md) ("Accepted residual risks"):
+
+- Synthetic data, local demo — not a production deployment, and not complete
+  enterprise agent discovery.
+- The Streamlit page's event timeline is in-memory; the durable SQLite audit
+  trail is exercised by the tests and evals directly, and wiring it into the UI
+  is a post-MVP item.
+- Approval is a single free-text reviewer — no identity check, no RBAC, no
+  separation of duties.
+- No production auth/authz, multi-tenancy, high availability, or compliance
+  certification. See [`docs/post_mvp_backlog.md`](docs/post_mvp_backlog.md).
+
 ## Learn more
 
-- [`START_HERE.md`](START_HERE.md) — course navigation and how to re-verify the build
-- [`docs/lab_execution_index.md`](docs/lab_execution_index.md) — the authoritative map of all 80 labs
+- [`START_HERE.md`](START_HERE.md) — how to verify and demo the build in five minutes
 - [`docs/v4_architecture.md`](docs/v4_architecture.md) — state-by-state authority table and the six trust boundaries
 - [`docs/v4_state_machine.md`](docs/v4_state_machine.md) — the transition map, its enforcement, and the audit log
 - [`docs/v4_threat_model.md`](docs/v4_threat_model.md) — the abuse categories, the control for each, and the test that proves it
 - [`docs/v4_github_demo_setup.md`](docs/v4_github_demo_setup.md) — the private synthetic demo repo, the allowlist, and the optional draft-PR run
-- [`docs/final_mvp_interview_brief.md`](docs/final_mvp_interview_brief.md) — eleven likely interview questions answered from the real code
-- [`docs/post_mvp_backlog.md`](docs/post_mvp_backlog.md) — what a next version would build, and how this prototype maps to résumé / portfolio / interviews
+- [`docs/final_mvp_interview_brief.md`](docs/final_mvp_interview_brief.md) — eleven design questions answered from the real code
+- [`docs/post_mvp_backlog.md`](docs/post_mvp_backlog.md) — what a next version would build, and why each item is outside the MVP
 - [`docs/v3_to_v4_handoff.md`](docs/v3_to_v4_handoff.md) — why v4 governs writes through proposals + approval instead of a write tool
 - [`evidence/README.md`](evidence/README.md) — reproduce and save proof of every claim yourself
 - [`docs/roadmap.md`](docs/roadmap.md) — the full v1–v4 plan
+- [`docs/lab_execution_index.md`](docs/lab_execution_index.md) — the full build log: the ~80 incremental, individually tested steps this was built in
 - `CLAUDE.md` — the standing safety boundaries for working in this repo
 
 ## Safety boundaries

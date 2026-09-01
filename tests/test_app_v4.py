@@ -148,9 +148,10 @@ def test_render_iterates_the_journey_stages():
 
 
 def test_app_v4_imports_only_the_expected_engine_modules_so_far():
-    # Labs 2-4 wired in remediation_templates, proposal_hash, approval,
-    # verifier, and github_plan. The SQLite audit trail and the
-    # v4_service orchestrator are Day 10 and must NOT be imported yet.
+    # The page composes remediation_templates, proposal_hash, approval,
+    # verifier, and github_plan directly. The SQLite audit trail (audit_db)
+    # and a v4_service orchestrator are deliberately NOT wired into the page
+    # (see docs/post_mvp_backlog.md); this asserts the import stays out.
     for forbidden in ("v4_service", "audit_db"):
         assert f"import {forbidden}" not in APP_SOURCE
 

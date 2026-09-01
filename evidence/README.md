@@ -1,12 +1,13 @@
 # AgentGuard — Evidence
 
 This folder is the reproducible proof for every claim AgentGuard makes. Each
-section below is a command you can re-run (or a file to open) plus the exact
-result to expect — not a claim to take on faith. Sections are in the order
-they were added, oldest first. The v3 set runs through the two
-**"Day 10"** sections — the complete capture across all three layers
-(protocol, product, verification) and the five-minute demo. The v4 sections
-follow, beginning with **"AgentGuard v4 — Day 1 Evidence"**.
+section is a command you can re-run (or a file to open) plus the exact result to
+expect — not a claim to take on faith.
+
+**Reviewing v4?** Skip to the two final v4 sections near the end — the
+three-layer capture checklist (protocol · product · verification) and the
+rehearsable five-minute demo. Everything above them is a dated archive of the
+v1 → v4 build, in the order it was captured.
 
 ---
 
@@ -477,13 +478,13 @@ touches, not a claim you have to take on faith.
    ```bash
    python scripts/run_release_gate.py
    ```
-   Expect the run to end `RELEASE GATE PASS for AgentGuard v4` — 230 unit tests
-   passed, the v2 evaluation matrix passed, the v3 six-category security suite
-   passed, the secret scan clean, and the source-only "exactly five read-only
-   tools" check verified. Save as `evidence/day01-release-gate.png` (or paste
-   the text output). This is the known-good baseline every later day's work is
-   compared against; the only change from v3's gate is the version string it
-   prints.
+   Expect the run to end `RELEASE GATE PASS for AgentGuard v4` — every unit test
+   passing (874 at completion), the v2 evaluation matrix passed, the v3
+   six-category security suite passed, the secret scan clean, and the
+   source-only "exactly five read-only tools" check verified. Save as
+   `evidence/day01-release-gate.png` (or paste the text output). At the start of
+   v4 this was the inherited v1–v3 baseline; the only change from v3's gate then
+   was the version string it prints.
 
 3. **The v4 state machine and trust-boundary design (Lab 7).**
    The file itself: `docs/v4_architecture.md`. No command to run — save a
@@ -639,7 +640,7 @@ streamlit run app_v4.py
 The automated proof. One screenshot or pasted text each.
 
 ```bash
-python -m pytest -q                    # every unit test  -> "868 passed" (or current)
+python -m pytest -q                    # every unit test  -> "874 passed" (or current)
 python evals/run_v2_evals.py           # "V2 EVALUATION PASS: 3 of 3 cases passed"
 python evals/run_v3_evals.py           # six [PASS] lines + "V3 SECURITY EVAL SUITE PASS"
 python evals/run_v4_evals.py           # ten PASS lines + "10 of 10 checks held (fails closed)"

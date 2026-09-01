@@ -72,7 +72,7 @@ def test_readme_has_the_release_gate_test_report():
     lower = README.lower()
     assert "test report" in lower
     # the real, reproducible numbers
-    assert "866 passed" in README
+    assert "874 passed" in README
     assert "V2 EVALUATION PASS: 3 of 3" in README
     assert "V3 SECURITY EVAL SUITE PASS" in README
     assert "10 of 10 checks held" in README

@@ -1,19 +1,19 @@
-# AgentGuard v4 — Post-MVP Backlog and Job-Search Integration
+# AgentGuard v4 — Post-MVP Roadmap
 
-Two parts: what a real next version would build (and why each item is
-deliberately outside the MVP), and how the finished prototype turns into
-résumé, LinkedIn, portfolio, and interview material.
+The main body is the **product backlog**: what a real next version would build,
+and why each item is deliberately outside the MVP. The scope boundary is a
+decision, not an omission — being able to say "here is what I would do next, and
+the trade-off I made to leave it out" is the point.
 
-The MVP scope boundary is a decision, not an omission. Everything below the line
-is named, not hidden — being able to say "here is what I would do next, and the
-trade-off I made to leave it out" is the point.
+A final **Appendix** collects the builder's own job-search notes (résumé,
+LinkedIn, portfolio, interview prep). It is working material for applications,
+not part of the product and not a claim about it.
 
 ---
 
-# Part 1 — Post-MVP backlog
-
-Each item: **what**, **why it is out of MVP scope**, **rough approach**. Several
-turn forward an *accepted residual risk* from `docs/v4_threat_model.md`.
+Each backlog item below is stated as **what**, **why it is out of MVP scope**,
+and **rough approach**. Several turn forward an *accepted residual risk* from
+`docs/v4_threat_model.md`.
 
 ## Identity & authorization
 
@@ -124,19 +124,19 @@ would weaken any of these is rejected, not scheduled.
 
 ---
 
-# Part 2 — Job-search integration
+## Appendix: Builder self-review and application notes
 
-How the finished prototype supports résumé, LinkedIn, portfolio, and targeted
-interviews. Fill in your own name, links, and contact details — the templates
-below use placeholders on purpose.
+Working material for the builder's own **job-search** — not part of the product,
+and not a claim about it. Résumé bullets, a LinkedIn blurb, a portfolio entry,
+and an interview map, with placeholders for name, links, and contact details.
 
-## Résumé bullets (pick 3–5; keep them honest and quantified)
+### Résumé bullets (pick 3–5; keep them honest and quantified)
 
 - Built **AgentGuard**, a governed AI-agent remediation MVP: deterministic risk
   scoring (5 rules), a policy-grounded LLM explanation layer with citation
   validation, read-only MCP 2.x discovery (exactly 5 tools), SHA-256-bound human
   approval, isolated verification, draft-only GitHub delivery, and an
-  append-only SQLite audit trail — **872 automated tests** behind a
+  append-only SQLite audit trail — **874 automated tests** behind a
   **one-command release gate**.
 - Designed an **explicit remediation state machine** with fail-closed terminal
   states and a **failure-injection evaluation** (`run_v4_evals.py`) that injects
@@ -153,7 +153,7 @@ below use placeholders on purpose.
 - Packaged the app as a **non-root Docker container** with a CI pipeline running
   the full unit + evaluation + secret-scan suite on every push.
 
-## LinkedIn "About" / project blurb (2–3 sentences)
+### LinkedIn "About" / project blurb (2–3 sentences)
 
 > AgentGuard is a reference MVP for governing AI agents in an enterprise: it
 > discovers agent inventory over a read-only protocol boundary, scores risk with
@@ -163,7 +163,7 @@ below use placeholders on purpose.
 > propose, but never decides risk or changes production. It's a synthetic,
 > local demo built to make each security control visible and defensible.
 
-## Portfolio entry
+### Portfolio entry
 
 **One-liner:** *A governed AI-agent remediation MVP — deterministic risk,
 grounded explanation, human-approved and verified change, draft-only delivery,
@@ -180,7 +180,7 @@ full audit and rollback.*
 | `evidence/README.md` | The three-layer capture checklist and the five-minute demo script |
 | The five-minute demo recording | The trust chain, live, with no credential on screen |
 
-## Targeted-interview map
+### Targeted-interview map
 
 | Role / topic | Open this artifact | Raise this backlog item |
 |---|---|---|
@@ -190,7 +190,7 @@ full audit and rollback.*
 | AI product | the visible chain of trust in `README.md` + the demo | design-partner pilots on real inventory |
 | Backend / data | `audit_db.py` (append-only, `id`-ordered) + `proposal_hash.py` | wire the durable audit trail into the UI (`v4_service`) |
 
-## What NOT to claim
+### What NOT to claim
 
 - This is a **synthetic, local demo**, not a production deployment.
 - It is **not** complete enterprise agent discovery or full coverage.

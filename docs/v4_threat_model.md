@@ -31,8 +31,7 @@ applies; it never produces the change.
 
 **Proven by:** `tests/test_remediation_templates.py` (an unknown template is
 blocked; each template changes only its documented field);
-`tests/test_app_v4.py::test_an_unallowlisted_template_is_refused_before_touching_an_agent`;
-`evals/run_v4_evals.py` "a risk-raising remediation is blocked before planning".
+`tests/test_app_v4.py::test_an_unallowlisted_template_is_refused_before_touching_an_agent`.
 
 ## 2. Stale or replayed approval
 

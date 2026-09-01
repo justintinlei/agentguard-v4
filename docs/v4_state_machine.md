@@ -7,8 +7,8 @@ only be in one of the states below and may only move along an arrow that
 is explicitly listed. Any state or step not written here is refused.
 
 This document is the map. `workflow.transition()` enforces it (see
-**Enforcement** below); the durable audit log of every step
-(`audit_db.py`) is Day 5 Labs 4–5.
+**Enforcement** below); the durable audit log of every step lives in
+`audit_db.py`.
 
 ## States
 
@@ -165,19 +165,20 @@ log cannot change it.
   the events happened — even across interleaved writes from other
   workflows.
 
-## Reconciliation with `docs/v4_architecture.md`
+## Relationship to `docs/v4_architecture.md`
 
-`docs/v4_architecture.md` (Day 1 Lab 7) sketched the machine before the
-code existed and shows two arrows this implemented map does **not**
-include:
+This document is the canonical transition map. `docs/v4_architecture.md`
+has been reconciled against it — the two agree — and adds the per-state
+*data / authority / gate* view and the trust boundaries. Two things to
+note about the implemented map, because an earlier design draft got them
+wrong:
 
-- `APPROVED → REJECTED` — the implemented map has `APPROVED → {VERIFIED,
-  FAILED}`; withdrawing approval is a `FAILED`, not a `REJECTED`.
-- `DRAFT_PR_CREATED → FAILED` — the implemented map has
-  `DRAFT_PR_CREATED → {ROLLED_BACK}` only.
+- **Withdrawing approval is a `FAILED`, not a `REJECTED`.** `REJECTED` is
+  reachable from `PROPOSED` only; `APPROVED → {VERIFIED, FAILED}`.
+- **`DRAFT_PR_CREATED → {ROLLED_BACK}` only** — there is no
+  `DRAFT_PR_CREATED → FAILED` arrow. Once a draft PR exists, undoing it is
+  a reversal, not a failure.
 
-The Day-1 prose also mentions a stale approval sending the workflow
-"back to `PROPOSED` / `REJECTED`"; there is no backward edge — a stale
-approval fails the `APPROVED → VERIFIED` check and the workflow goes to
-`FAILED`. `workflow.py` and this document are authoritative; the Day-1
-narrative doc is scheduled for reconciliation in Day 10 Lab 5.
+A stale approval fails the `APPROVED → VERIFIED` check and the workflow
+goes to `FAILED`; there is no backward edge. `workflow.py` and this
+document are authoritative.

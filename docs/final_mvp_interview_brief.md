@@ -158,7 +158,7 @@ multi-tenancy, and no production auth/HA/compliance — those are post-MVP work.
   fail-closed terminals, human-in-the-loop approval bound to content hashes,
   deterministic guardrails, isolated verification, rollback, and an append-only
   audit log.
-- **Engineering practice** — Python, Streamlit, pytest (870 tests), a
+- **Engineering practice** — Python, Streamlit, pytest (874 tests), a
   one-command release gate, failure-injection evaluation, GitHub CLI integration
   behind an allowlist, Docker packaging as non-root, CI, threat modeling, and
   product storytelling.

@@ -2,8 +2,8 @@
 
 ## v1 — Local Policy Scanner (done)
 Local JSON inventory, five deterministic rules (AG-001–AG-005), a Streamlit
-UI, and four pytest tests. This is the verified baseline this v2 folder was
-copied from — its scoring logic does not change in v2.
+UI, and four pytest tests. This is the verified baseline every later version
+builds on — its scoring logic is unchanged from v1 through v4.
 
 ## v2 — Grounded AI Analyst (done)
 Adds a Claude API explanation layer on top of the v1 scanner: it retrieves
@@ -34,7 +34,7 @@ request logged. `python scripts/run_release_gate.py` ended
 `RELEASE GATE PASS for AgentGuard v3`. This is the frozen baseline the v4
 folder was copied from.
 
-## v4 — Governed Remediation MVP (this project, Day 1–10, released)
+## v4 — Governed Remediation MVP (this project — complete)
 A bounded, human-approved, verified, auditable remediation workflow on top
 of v3's discovery. Deterministic rules pick one of three allowlisted
 templates; source and proposal are SHA-256 hashed; a named human APPROVEs or
