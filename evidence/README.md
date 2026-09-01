@@ -1,11 +1,13 @@
 # AgentGuard — Evidence
 
 This folder is the reproducible proof for every claim AgentGuard makes. Each
-section below is a command you can re-run (or a file to open) plus the exact
-result to expect — not a claim to take on faith. Sections are in the order
-they were added, oldest first. The last section,
-**"Day 10: Final evidence capture"**, is the complete v3 set across all three
-layers — protocol, product, and verification.
+section is a command you can re-run (or a file to open) plus the exact result to
+expect — not a claim to take on faith.
+
+**Reviewing v4?** Skip to the two final v4 sections near the end — the
+three-layer capture checklist (protocol · product · verification) and the
+rehearsable five-minute demo. Everything above them is a dated archive of the
+v1 → v4 build, in the order it was captured.
 
 ---
 
@@ -450,3 +452,267 @@ Don't debug live. Use a fallback, in this order — any one still makes the poin
   rollback** — not a write tool added to the discovery server.
 - Any live external integration must be verified on your own machine with
   dedicated test accounts.
+
+---
+
+# AgentGuard v4 — Day 1 Evidence
+
+Day 1 has no application to screenshot yet — it's setup, orientation, and one
+design document, exactly like v2's and v3's Day 1. Its evidence package is four
+small, reproducible proof points: a command you can re-run plus the file it
+touches, not a claim you have to take on faith.
+
+1. **A separate branch with a baseline commit (Lab 4).**
+   ```bash
+   git log --oneline --all --decorate
+   ```
+   Expect: `main` still at `f813e24 Add V4 course prompts and lab index`, and
+   `v4-development` one commit ahead at `517db77 Complete Day 1 setup: V4
+   orientation and prompt adjustments`. Save as
+   `evidence/day01-branch-and-commit.png` (or paste the text output). The Day 1
+   Lab 5–8 updates (the release-gate rename, `docs/v4_architecture.md`, and the
+   later learning-log entries) sit on top of that commit as working-tree
+   changes, not yet committed.
+
+2. **The full v1–v3 release gate passing (Lab 5).**
+   ```bash
+   python scripts/run_release_gate.py
+   ```
+   Expect the run to end `RELEASE GATE PASS for AgentGuard v4` — every unit test
+   passing (874 at completion), the v2 evaluation matrix passed, the v3
+   six-category security suite passed, the secret scan clean, and the
+   source-only "exactly five read-only tools" check verified. Save as
+   `evidence/day01-release-gate.png` (or paste the text output). At the start of
+   v4 this was the inherited v1–v3 baseline; the only change from v3's gate then
+   was the version string it prints.
+
+3. **The v4 state machine and trust-boundary design (Lab 7).**
+   The file itself: `docs/v4_architecture.md`. No command to run — save a
+   screenshot of the state diagram and the per-state
+   *data / authority / gate* table, or just keep the file as the evidence. It
+   records, before any action-layer code exists, what the system may do at each
+   workflow state and which check must pass to move forward.
+
+4. **The Day 1 learning log (Labs 1–8).**
+   The file itself: `notes/learning_log.md`. Its "Day 1 Summary — Labs 1 through
+   8" entry indexes what was learned in each lab — the readable record a
+   beginner or an interviewer can point to without re-reading every entry.
+
+---
+
+# AgentGuard v4 — The no-production pledge
+
+v4 is the first version that can *change* an agent's configuration. This is the
+written commitment about what that capability will and will not touch. Every
+item is enforced by code built later in the course, not left to good intentions;
+this section is the checklist an auditor or interviewer can hold the project to.
+
+- **Synthetic data only.** Every agent, tool, and ownership record is fabricated
+  for the demo. No real cloud account, identity provider, or agent registry is
+  ever contacted.
+- **A dedicated demo repository, never production.** GitHub work targets one
+  private repository created only for this training (Day 2). It is never the
+  AgentGuard source repository and never a production system. The repository,
+  the branch-name prefix, and the single target file path are all on a fixed
+  allowlist; anything else is refused.
+- **Draft pull requests only.** There is no merge command anywhere in the code.
+  A remediation reaches GitHub only as a draft PR that a human must review and
+  merge by hand.
+- **Dry-run by default.** The GitHub step prints the exact commands it would run
+  and changes nothing. Live execution is a separate, explicit opt-in.
+- **Isolated verification.** A proposal is applied only to a throwaway temporary
+  copy of the environment for re-scanning. The source data is never modified in
+  place.
+- **The discovery boundary stays read-only.** The MCP server keeps exactly five
+  read-only tools; v4 adds no write tool to it. The remediation workflow is a
+  separate component — see `docs/v3_to_v4_handoff.md`.
+- **No autonomous remediation.** A human approval, cryptographically bound to
+  the exact proposal and the exact source it was built from, gates every applied
+  change. The AI layer may explain a finding and propose a remediation; it may
+  never approve, apply, verify, or score.
+- **Deterministic authority is unchanged.** v1's `scanner.py` remains the sole
+  authority for the risk score, from v1 through v4. A proposal *predicts* a
+  score; it never sets one.
+- **Live steps are the user's to run.** Any real external action (installing
+  `gh`, authenticating, creating the demo repo, opening a real draft PR) is
+  performed by the user on their own machine with a dedicated test account, and
+  only when a lab explicitly calls for it.
+
+---
+
+# AgentGuard v4 — Day 10: Final evidence capture (protocol · product · verification)
+
+"It works" is three separate claims — the protocol boundary is real, the product
+behaves, and the automated checks pass — and they can fail independently. This is
+the complete set to capture for a demo, a recording, or an interview: one
+screenshot (or pasted text) per item, grouped by layer. It mirrors v3's Day 10
+capture, extended for the governed-remediation workflow.
+
+## Before you capture anything — the credential-safety checklist
+
+The learning goal for this lab is *showing the system without exposing
+credentials*. A demo that touches GitHub is exactly where a secret leaks onto a
+shared screen or into a recording. **Nothing in this list may appear in any
+screenshot, paste, or video frame:**
+
+- a `.env` file, open in an editor or shown by `cat` / `ls -la` — it holds the
+  optional `ANTHROPIC_API_KEY`;
+- any `ANTHROPIC_API_KEY=...` line, in a terminal, an env dump (`env`,
+  `printenv`), or a shell prompt;
+- any string shaped like `sk-ant-...`, `github_pat_...`, or `gho_` / `ghp_` /
+  `ghs_` / `ghr_` / `ghu_` followed by a long token body;
+- the `Token:` line from `gh auth status` (the app's `gh auth` panel already
+  strips it — capture the panel, not the raw command);
+- the contents of `~/.config/gh/` or `~/.ssh/`;
+- a browser password manager, an autofill dropdown, or a "save password" prompt;
+- shell history (`history`, a scrollback buffer) containing any of the above.
+
+Before recording: open a fresh terminal, close editor tabs and browser tabs that
+could hold a secret, and confirm every data value on screen is synthetic (the
+three demo agents, the `justintinlei/agentguard-remediation-demo` repo). If in
+doubt, don't show it.
+
+## Layer 1 — Protocol (MCP Inspector)
+
+The wire-level view — unchanged from v3, because v4 adds no tool. Exact expected
+values for every call are in `docs/v3_inspector_walkthrough.md`.
+
+```bash
+npx @modelcontextprotocol/inspector python mcp_server.py
+```
+
+Open the printed local URL, click **Connect**, open the **Tools** panel:
+
+1. **Exactly five read-only tools** — `health_check`, `list_agent_inventory`,
+   `get_agent_by_name`, `list_tool_catalog`, `list_agent_ownership`, and nothing
+   else. Save as `evidence/day10-v4-inspector-tools.png`.
+2. **`health_check`** → `status: "ok"`, `mode: "read-only"`, `tool_count: 5`.
+   Save as `evidence/day10-v4-inspector-health.png`.
+3. **`list_agent_inventory`** → `count: 3`; `source_name: "agents.json"`;
+   `source_sha256` is 64 hex characters — note it for the cross-layer check.
+   Save as `evidence/day10-v4-inspector-inventory.png`.
+
+## Layer 2 — Product (`streamlit run app_v4.py`)
+
+What an operator actually sees. The whole governed remediation journey in one
+page.
+
+```bash
+streamlit run app_v4.py
+```
+
+1. **The boundary and the journey map.** Capture the "Safety boundary" bullet
+   list and the six-stage "v4 remediation journey" map (Discovery → Proposal →
+   Approval → Verification → Plan → Audit), each stage tied to a real
+   `workflow.STATES` token. Save as `evidence/day10-v4-app-journey.png`.
+
+2. **Build a proposal.** Agent = **Customer Support Agent**, template =
+   **REQUIRE_HUMAN_APPROVAL**, click **Build proposal**. Capture the proposal
+   JSON (`field_changes: {"human_approval_required": true}`), the **Proposal
+   SHA-256**, and the **Source SHA-256**. Save as
+   `evidence/day10-v4-app-proposal.png`.
+
+3. **Approve and verify.** Reviewer name, a decision reason, decision =
+   **APPROVE**, click **Approve & verify**. Capture:
+   - the **Content hashes** block — the exact proposal and source SHA-256 the
+     approval is bound to;
+   - the **Approval record** (`decision: APPROVE`, the reviewer, both hashes)
+     and the "still current: True" caption;
+   - the **Verification** summary — `Verification PASSED (10/10 checks)` and the
+     `HIGH-risk agents: before 2 -> after 1` caption;
+   - the **Event timeline** — `PROPOSED` → `APPROVED` → `VERIFIED`.
+   Save as `evidence/day10-v4-app-approve-verify.png`.
+
+4. **The GitHub dry-run plan.** For the VERIFIED run, capture the five commands
+   (`git checkout -b agentguard/<id>` → `git add …` → `git commit -m …` →
+   `git push -u origin agentguard/<id>` → `gh pr create --draft …`), the
+   `DRY_RUN` status on every row, and the `GITHUB_SAFETY_WARNINGS` bullets. Save
+   as `evidence/day10-v4-app-dry-run-plan.png`.
+
+5. **The `gh auth` panel — authenticated, no token.** Capture the "GitHub CLI
+   authentication" panel. It shows `gh` is authenticated **and shows no
+   credential** — the panel runs `gh auth status` and strips the `Token:` line
+   before display (`app_v4._strip_token_lines`). This is the "show it without
+   exposing it" point, on screen. Save as `evidence/day10-v4-app-gh-auth.png`.
+
+## Layer 3 — Verification (tests, evals, gate)
+
+The automated proof. One screenshot or pasted text each.
+
+```bash
+python -m pytest -q                    # every unit test  -> "874 passed" (or current)
+python evals/run_v2_evals.py           # "V2 EVALUATION PASS: 3 of 3 cases passed"
+python evals/run_v3_evals.py           # six [PASS] lines + "V3 SECURITY EVAL SUITE PASS"
+python evals/run_v4_evals.py           # ten PASS lines + "10 of 10 checks held (fails closed)"
+python scripts/run_release_gate.py     # everything, one line: "RELEASE GATE PASS for AgentGuard v4"
+python -m compileall -q .              # no output, exit 0
+```
+
+Save as `evidence/day10-v4-verify-pytest.png`, `-v2-evals.png`, `-v3-evals.png`,
+`-v4-evals.png`, `-release-gate.png`.
+
+## The cross-layer check
+
+The same fact, seen three ways — this is what shows the layers describe one
+system, not three:
+
+```bash
+shasum -a 256 connected_environment/agents.json
+```
+
+The 64-character digest printed here must equal the `source_sha256` in the
+Inspector `list_agent_inventory` response (Layer 1, step 3) **and** the Source
+SHA-256 shown in the app after building a proposal (Layer 2, step 2).
+
+---
+
+# AgentGuard v4 — Day 10: The five-minute demo (video plan)
+
+A rehearsable walkthrough that *proves* the governed-remediation trust model —
+deterministic finding, bounded proposal, exact-hash approval, isolated
+verification, draft-only delivery — not just shows a working app. Practise it
+against a timer; it should finish under 5:00.
+
+## Before you start
+
+- Run the **credential-safety checklist** above. In particular: no `.env` open,
+  no terminal showing an API key or a `gh` token, no browser password UI.
+- `source .venv/bin/activate` in a terminal at the repo root.
+- `streamlit run app_v4.py` already open in a browser tab.
+- A second, clean terminal ready in the repo root.
+- `connected_environment/agents.json` present (not renamed from a prior run).
+
+## The script — six beats
+
+| Time | Do | Say (the point) |
+|---|---|---|
+| 0:00–0:40 | The app is on screen. Scroll the "Safety boundary" list and the six-stage journey map. | "v1 through v3 only ever *read and scored* agent risk. v4 can *change* an agent's config — on synthetic data, through a draft pull request. The rule: deterministic code decides *what* to fix, software verifies it, a human approves *intent*, and the AI layer only ever explains or proposes. v1's scanner is still the only thing that sets a risk score." |
+| 0:40–1:40 | Agent = **Customer Support Agent**, template = **REQUIRE_HUMAN_APPROVAL**. Click **Build proposal**. Point at the proposal JSON and the two SHA-256 lines. | "The scanner flagged this agent HIGH — it can delete customer records and read sensitive data with no human gate. The fix is one of exactly three allowlisted templates — never a free-form AI patch. The proposal is one bounded field change, and we hash *both* the exact source inventory and the exact proposal." |
+| 1:40–2:50 | Reviewer name, a reason, decision **APPROVE**, click **Approve & verify**. Point at the Content hashes, the Approval record, the Verification checklist, the timeline. | "A named person approves — and the approval is cryptographically bound to those two hashes, so if the proposal or the source changes, this approval is stale and the workflow fails closed. Then *software*, not the human, verifies: it applies the change to a throwaway copy and re-scans. Ten of ten checks pass, and the HIGH-risk count drops from two to one." |
+| 2:50–3:40 | Scroll to the GitHub dry-run plan. Read the five commands and the warnings. | "This is the delivery step, and by default it *runs nothing* — it shows the exact five commands. Four `git` steps that stay on an `agentguard/` branch, then `gh pr create --draft`. There is no merge command anywhere in the codebase. A live run is a separate, deliberate opt-in the page itself can never trigger." |
+| 3:40–4:20 | Point at the "GitHub CLI authentication" panel. In the second terminal: `shasum -a 256 connected_environment/agents.json`. | "The app confirms GitHub access works and shows no token — it reads `gh auth status` and strips the credential line. And this digest in the terminal matches the Source SHA-256 on the page: anyone can re-verify exactly which bytes were scanned and approved." |
+| 4:20–5:00 | Second terminal: `python scripts/run_release_gate.py`. | "One command re-proves every layer — v1–v4 unit tests, the v2, v3, and v4 evaluation suites, the secret scan. The v4 eval injects ten bad inputs — a skipped state, a post-merge rollback, an unapproved repo — and passes only because v4 *refuses* each. It ends `RELEASE GATE PASS for AgentGuard v4`." |
+
+## If something breaks
+
+Don't debug live. Use a fallback, in this order — any one still makes the point:
+
+1. `python evals/run_v4_evals.py` → the ten `PASS` lines and
+   `10 of 10 checks held (fails closed)`.
+2. `python -m pytest -q` → every test passing.
+3. The dry-run plan JSON from a prior run — the five commands, every one
+   `DRY_RUN`.
+
+## What NOT to claim
+
+- This is **synthetic data in a local demo**, not a production deployment.
+- It is **not** complete enterprise agent discovery or full coverage.
+- The AI layer **never** approves, applies, verifies, or scores — it explains
+  and proposes only. `scanner.py` is the sole risk-score authority.
+- The GitHub step is **dry-run by default and draft-only**; the one live draft
+  PR is a separate, explicitly approved manual step, and **there is no merge
+  command in the code**.
+- There is **no autonomous remediation** — every applied change is gated by a
+  human approval bound to the exact reviewed content.
+- Any live external action must be run on your own machine with a dedicated
+  test account.

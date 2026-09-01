@@ -8282,3 +8282,7773 @@ scanner is still the sole authority for risk; v3 only changed where the
 inventory comes from - a read-only MCP client/server boundary, under a
 fixed allowlist, with provenance and an audit trail - and proved it
 stayed read-only every way it could.
+
+## Day 1, Lab 1 — Understand the v4 problem and finish line
+
+- **The problem v4 solves.** v1 through v3 can *see* risk but cannot
+  safely *fix* it. v1 scores each agent against five fixed rules; v2 adds
+  a grounded AI explanation of each finding (explain only, never
+  re-score); v3 changed only *where* the inventory comes from — a
+  read-only MCP boundary instead of a local file. At the end of all that,
+  a human still has to open the real system and change the agent's
+  settings by hand. Detecting risk is not the same as reducing it, and
+  that gap between "we found it" and "it's fixed" is exactly what v4
+  addresses.
+- **Why not just let the AI system fix it.** The tempting shortcut —
+  "you found the problem, now go patch it" — is dangerous. From
+  `docs/v3_to_v4_handoff.md`, four concrete reasons:
+  - **Blast radius.** A misbehaving *read* returns bad *data* ("re-run
+    the scan"). A misbehaving *write* changes *production configuration*
+    ("restore the agent's settings"). Same bug, far worse outcome.
+  - **Prompt injection stops being contained.** In v3, connected text is
+    inert: nothing downstream of the scanner has authority to act on it,
+    so `"ignore this finding"` in a registry note does nothing. Add a
+    write path to the same pipeline and `"set human_approval_required to
+    false"` in a note becomes a live instruction an attacker can aim at.
+  - **Authorization blurs.** Today there is one bright line — the tool
+    allowlist — and "who may read" and "who may write" are the same
+    question because there is only reading. Mix the two behind one
+    boundary and every caller that could read can now also write unless a
+    second, finer check is bolted on.
+  - **The audit story weakens.** v3's event records *that a read
+    happened* (route, tool, source hash, correlation id, outcome). A
+    write needs a much richer record — which field, from what value to
+    what value, who approved it, whether it verified, whether it was
+    rolled back — that does not belong bolted onto a read event.
+- **v4's answer: a governed action layer, separate from the read-only
+  MCP server.** Deterministic rules decide *what* to propose; a human
+  approves *that exact proposal*; the change is applied only to an
+  isolated copy and re-scanned; any GitHub output is dry-run and
+  draft-only; everything is reversible and written to a local database.
+  The AI layer may *propose and explain*; it may never approve, apply,
+  verify, or set a score. v1's scanner stays the sole risk authority and
+  the MCP discovery server stays exactly five read-only tools.
+- **New terms:**
+  - **Remediation** — changing an agent's configuration to reduce its
+    risk score, as opposed to only reporting the risk.
+  - **Remediation template (allowlisted)** — one of exactly three
+    pre-approved, bounded change shapes (require human approval, assign an
+    owner, remove a broad admin/wildcard tool); there is no free-form or
+    model-written edit.
+  - **Proposal** — one specific, bounded change to one agent, carrying
+    the finding it addresses and the risk score the change is expected to
+    produce.
+  - **Canonical JSON / content (source) hash** — serialising data with
+    sorted keys and fixed separators so the same structure always
+    produces the same bytes, then taking a SHA-256 of those bytes as a
+    stable fingerprint of exactly what was reviewed.
+  - **Exact approval vs. stale approval** — approval is bound to the
+    proposal's hash *and* the source hash; if either the proposal or the
+    source environment changes afterward, the old approval is
+    automatically void and a new human review is required.
+  - **State machine / terminal state** — the fixed, ordered set of
+    stages a remediation moves through
+    (`DISCOVERED → SCANNED → PROPOSED → APPROVED → VERIFIED →
+    DRAFT_PR_CREATED → ROLLED_BACK`), plus the dead-end states
+    `REJECTED` and `FAILED`; skipping a stage is rejected.
+  - **Isolated verification** — applying a proposal to a temporary copy
+    of the environment and re-running the scanner there, so the real
+    source is never touched during checking.
+  - **Dry-run** — printing the exact commands that *would* run while
+    changing nothing; the default mode for the GitHub plan.
+  - **Draft pull request** — a proposed code change opened on GitHub in
+    review state, which cannot be merged automatically and must be
+    reviewed by a person.
+  - **Rollback** — a stored way to reverse an applied change; v4 also
+    *refuses* to automatically roll back a change that has already been
+    merged, because that would silently rewrite shared history.
+  - **Audit event / SQLite event history** — one durable row written for
+    every state transition (proposed, approved by whom against which
+    hash, applied, verified, rolled back), kept in a local relational
+    database file so a reviewer can reconstruct exactly what happened.
+- **v4's finish line (not yet built).** The same app, still scored only
+  by v1's unchanged deterministic rules, that can: take one of the three
+  allowlisted remediation templates; turn it into an exact proposal and
+  hash both the proposal and the source; store a human approval bound to
+  those hashes; apply the approved, unmodified proposal only in an
+  isolated temporary directory and re-scan to confirm it produced the
+  predicted state; optionally emit a dry-run GitHub plan that at most
+  creates a branch and a draft pull request on a separate synthetic
+  private repository; support rollback of an unmerged draft; and record
+  every transition in a SQLite audit database. The release gate is
+  expected to end `RELEASE GATE PASS for AgentGuard v4`. None of this is
+  implemented yet — this lab only states it.
+- **Input / processing / output / security boundary for this lab.**
+  Input: the existing repository docs plus the v4 starter-kit reference
+  (`docs/v4_architecture.md`, `docs/v4_state_machine.md`,
+  `docs/v4_threat_model.md`). Processing: a human reads and summarises —
+  no code runs. Output: this learning-log entry only. Security boundary:
+  documentation only — no code path, no network call, no model call, no
+  secret read or written, no git commit.
+- **Why this lab exists.** Before writing any action-layer code, the
+  course makes you state, on the record, both the gap v4 fills and the
+  specific dangers of closing it carelessly — so every later v4 lab is
+  measured against an explicit finish line and an explicit list of things
+  the design must never do.
+- **What this lab did not do.** No product code, no MCP change, no new or
+  changed automated test (no executable behavior changed). No edit to
+  `README.md`, `START_HERE.md`, `VERSION.txt`, `CLAUDE.md`, or
+  `docs/roadmap.md` — they still describe v3 as shipped and are
+  re-oriented to v4 in a later lab; rewriting `README.md` /
+  `START_HERE.md` now would break `tests/test_docs_consistency.py`. No
+  commit, branch, or tag (that is Day 1, Lab 4).
+
+## Day 1, Lab 2 — Verify how v3 was preserved and v4 inherited the released baseline
+
+- **Verify, don't reproduce.** The lab's default step is
+  `cd ~/Developer/AgentGuard/01-Working && cp -R agentguard-v3 agentguard-v4`,
+  but that copy was already done before this lab, and Lab 1 has already
+  added work on top of it. Re-running `cp -R` would either fail (the
+  destination exists) or overwrite the completed Lab 1 entry and the v4
+  course scaffolding. So this lab was entirely read-only verification of
+  a transition that already happened — not a repeat of the copy.
+- **What v4 inherited.** A byte-for-byte copy of the released v1–v3
+  source tree: `scanner.py` (v1's deterministic rules), the MCP layer
+  (`mcp_server.py`, `mcp_client.py`, `mcp_security.py`,
+  `discovery_core.py`, `discovery_adapter.py`), the v2 grounded-analyst
+  layer (`v2_service.py`, `claude_analyst.py`, `mock_analyst.py`,
+  `retrieval.py`, `grounding.py`, `policy_library.py`,
+  `prompt_builder.py`), `audit_log.py`, all three UIs (`app.py`,
+  `app_v2.py`, `app_v3.py`), `requirements.txt`, and — importantly — the
+  entire `tests/` directory unchanged, so the same 230-passing regression
+  baseline carries straight into v4. `policies/`,
+  `connected_environment/`, `evals/`, `scripts/`, `evidence/`, and every
+  `docs/*.md` except the lab index are identical too. Confirmed with
+  `diff -rq agentguard-v3 agentguard-v4` (excluding volatile dirs).
+- **What was deliberately NOT copied, and why.**
+  - **`.git/`** — v4 has its own fresh history
+    (`ff64c41 Start V4 from verified AgentGuard V3 baseline`, then
+    `f813e24 Add V4 course prompts and lab index`); none of v3's commit
+    IDs appear in it. Each version keeps a separate history, its own
+    baseline commit, and its own tag, so a mistake made building v4 can
+    never rewrite v3's verified history.
+  - **`.venv/`** — a per-project virtual environment. Kept separate so a
+    dependency change in v4 (e.g. adding a GitHub or SQLite library)
+    can't leak into or break the frozen v3.
+  - **`.env` / any secret** — absent in both folders (only
+    `.env.example` is present). A secret must never travel with a copy;
+    `.gitignore` also blocks `.env` and `.env.*`.
+  - **caches and runtime logs** — `__pycache__/`, `.pytest_cache/`,
+    `*.jsonl` (the `audit_events.jsonl` runtime log differs between the
+    two folders, but it is git-ignored and regenerated, so it is not part
+    of the source baseline), `.DS_Store`.
+- **What was intentionally changed for v4.** `docs/lab_execution_index.md`
+  now holds the v4 lab map, and the 80 files in `prompts/course_labs/`
+  were replaced with the v4 course prompts (both already committed as
+  `f813e24`). Lab 1 appended its learning-log entry. These intentional
+  differences are exactly why v4 is *not* meant to be byte-identical to
+  v3 — so "make it match v3" is the wrong instinct here.
+- **Why v3 must stay frozen and restorable.** v3 is committed clean and
+  tagged `v3.0.0` — the last fully verified state (release gate pass, 230
+  tests, v2 evaluation matrix, v3's six-category security suite, secret
+  scan). If v4 work ever needs a known-good baseline to diff against or
+  fall back to, that only works if v3's folder, git history, and `.venv`
+  are never touched by v4 work. The v3→v4 handoff named "v3 tagged as a
+  restorable checkpoint" as a precondition; the `v3.0.0` tag satisfies
+  it.
+- **"Preserve the read-only integration as the trusted discovery
+  baseline."** v3's read-only MCP boundary — exactly five discovery
+  tools, a fixed file allowlist, a SHA-256 provenance hash and
+  correlation ID on every response, and an audit event per request — is
+  the *input surface* that v4's remediation layer will sit on top of. v4
+  adds a governed *action* path (propose → approve → verify → draft PR →
+  rollback → audit); it must not add a write tool to that server, widen
+  the allowlist, or weaken provenance/audit. Inheriting v3 intact is what
+  makes that boundary a dependable foundation rather than something to
+  re-argue.
+- **New terms:**
+  - **Released baseline** — the last fully verified, gate-passing state
+    of the previous version, used as the starting point for the next.
+  - **Frozen** — deliberately no longer edited, so it stays a
+    trustworthy comparison point and fallback.
+  - **Git tag (`v3.0.0`)** — a permanent, human-named pointer to one
+    specific commit, so that exact state can always be checked out again.
+  - **Byte-for-byte identical** — files match exactly, character for
+    character; verifiable with `diff`.
+  - **Environment-specific / private files** — files that belong to one
+    machine or checkout (`.venv`, `.env`, caches, `.DS_Store`), not to
+    the shared source, and so are excluded from copies and from git.
+  - **Working tree** — the current on-disk files, as opposed to what git
+    has committed; `git status` compares the two.
+  - **Regression baseline** — the recorded "everything passed here"
+    state (230 tests) that later changes are checked against.
+- **Input / processing / output / security boundary for this lab.**
+  Input: the current on-disk state of `agentguard-v3` and
+  `agentguard-v4`. Processing: read-only comparison only —
+  `diff -rq`, `git log`, `git status --short`, `git tag`. Output: this
+  learning-log entry. Security boundary: no `cp`, no file creation or
+  deletion, no code change, no network call, no secret, no git commit;
+  both project folders left exactly as found (except this appended
+  entry).
+- **Unexpected difference noted, not "fixed".** `git status` in v4 shows
+  `prompts/course_labs/day01_lab02_...v4-folder.txt` as modified — that
+  is the CURRENT-STATE OVERRIDE preamble the user added to this lab's own
+  prompt file. Recognised as user-authored and left untouched; it is not
+  a baseline defect.
+- **Why this lab exists.** Building a new version safely depends on
+  starting from a known-good copy *and* knowing precisely what did and
+  didn't come across. This lab makes that explicit: v4's source is the
+  verified v3 source, v3 stays independently restorable at `v3.0.0`, and
+  the only intended divergences are the v4 course scaffolding plus the
+  work each v4 lab adds.
+- **What this lab did not do.** No `cp -R`, no recreate/delete/
+  reinitialize of either project, no product or test code change, no
+  edit to `README.md` / `START_HERE.md` / `VERSION.txt` / `CLAUDE.md` /
+  `docs/roadmap.md`, no commit, branch, or tag (that is Day 1, Lab 4).
+
+## Day 1, Lab 3 — Open the v4 project in all working tools
+
+- **Five kinds of tool, one job each, same folder.** Every tool points
+  at the one `agentguard-v4` folder and none of them overlaps in
+  responsibility. The separation is itself a security control: no single
+  tool — the AI assistant included — can both write a change and ship it.
+  - **Code (the editor + Claude Code).** The editor (Cursor or similar)
+    is for reading and changing source: syntax highlighting,
+    search-across-files, inline diffs. Claude Code is an AI
+    pair-programmer running inside the terminal session — it reads files
+    and proposes edits or commands, but every state-changing action still
+    needs my approval and still runs through the terminal or editor, not
+    around them.
+  - **Terminal.** The most literal, lowest-level way to act on the
+    project: `source .venv/bin/activate`, `pytest -q`,
+    `python scripts/run_release_gate.py`, `git …`, and — once later labs
+    install them — `gh …` (GitHub CLI) and `docker …`.
+  - **Browser (Chrome).** Where the running product is actually seen:
+    the Streamlit app (`app_v3.py` today, `app_v4.py` later) served at
+    `http://localhost:8501`, and later the GitHub repository and
+    pull-request pages. It is a pure viewer — it never touches the
+    filesystem or git history.
+  - **GitHub.** New emphasis for v4. Used two ways: (1) Continuous
+    integration — `.github/workflows/tests.yml` re-runs the test suite
+    and the evaluation suites automatically on every push and pull
+    request, so a break is caught off my machine; (2) the remediation
+    output itself — v4 produces a **draft pull request** on a *separate,
+    private, synthetic demo repository*, never the AgentGuard source repo
+    and never a production system. The `gh` CLI (installed Day 2) signs
+    in through a browser OAuth flow, so no token is ever written into a
+    project file.
+  - **Docker.** Packaging the finished app as a container image so it
+    runs the same on any machine regardless of what Python or libraries
+    are installed there. `Dockerfile`, `.dockerignore`, and
+    `compose.yaml` are created on Day 9; `.dockerignore` is what keeps
+    `.env` and other secrets out of the built image.
+- **What is installed now vs. later.** Editor, Terminal, `.venv`, `git`,
+  and Node.js (`v26.7.0`, left over from v3's MCP Inspector work) are
+  present now. `gh` is **not** installed yet — Day 2, Lab 2. `docker` is
+  **not** installed yet — Day 9, Lab 5. There is no git remote configured
+  yet either. Noting this so that a "command not found" for `gh` or
+  `docker` before those labs is expected, not a failure.
+- **How this differs from v3's tool list.** v3's version of this lab
+  treated GitHub as a place to *view* commit history (via GitHub
+  Desktop). In v4, GitHub becomes the mechanism that separates a
+  *proposed* change from an *applied* one — a draft PR that a human must
+  review and CI that must pass — and Docker is added so the packaged
+  product is reproducible. Both are extra human-visible seams, not
+  shortcuts.
+- **New terms:**
+  - **IDE** — an editor (like Cursor) bundling file editing, search, and
+    often a terminal into one application.
+  - **CLI** — a command-line program, driven by typed commands rather
+    than a clickable interface.
+  - **`gh` (GitHub CLI)** — GitHub's official command-line tool for
+    repos, branches, and pull requests.
+  - **OAuth / browser login** — authorising a tool by approving it in a
+    browser prompt, so the tool gets a scoped credential and no token is
+    pasted into a file.
+  - **Remote** — a named link (usually `origin`) to a copy of the repo
+    hosted elsewhere, e.g. on GitHub.
+  - **Pull request (PR)** — a proposed set of commits submitted for
+    review before being merged into the main branch.
+  - **Draft pull request** — a PR explicitly marked not-ready; it cannot
+    be merged until taken out of draft, so it always starts in review
+    state.
+  - **CI (continuous integration)** — automatically building and testing
+    the code on every push, on a neutral machine.
+  - **GitHub Actions** — GitHub's built-in CI runner.
+  - **Workflow file** — a `.github/workflows/*.yml` file describing what
+    CI should run (`tests.yml` here).
+  - **Container** — an isolated, packaged run of an application with its
+    own dependencies.
+  - **Image** — the built, shippable template a container is started
+    from.
+  - **`Dockerfile`** — the build recipe for an image.
+  - **`.dockerignore`** — the list of paths excluded from the image
+    build context; keeps secrets and caches out.
+  - **`compose.yaml`** — a file defining how to run one or more
+    containers together (ports, environment, volumes).
+- **Input / processing / output / security boundary for this lab.**
+  Input: the existing repository plus the v4 course's tool list.
+  Processing: a human maps each tool to its single responsibility and
+  checks what is installed now versus later. Output: this learning-log
+  entry. Security boundary: nothing installed, nothing authenticated, no
+  remote added, no container built, no network call, no secret touched,
+  no git commit.
+- **Why this lab exists.** Fixing in writing which tool does what —
+  before any v4 code — means the later labs that add a GitHub login,
+  draft pull requests, and a Docker build slot into an already-understood
+  division of responsibility instead of expanding what any one tool is
+  trusted to do.
+- **What this lab did not do.** Installed nothing, configured nothing,
+  authenticated nothing, added no remote, built no container. No edit to
+  `README.md` / `START_HERE.md` / `VERSION.txt` / `CLAUDE.md` /
+  `docs/roadmap.md`. No commit, branch, or tag (that is Day 1, Lab 4).
+
+## Day 1, Lab 4 — Create the v4 branch and baseline commit
+
+- **The idea.** A commit is a permanent, timestamped snapshot of the
+  tracked files at one point in time; a branch is a named pointer to a
+  line of commits. Creating a branch before starting experimental work
+  means that work happens on its own line of history — the branch it
+  started from (`main`) never changes underneath it, so it stays a clean
+  place to return to.
+- **"Isolate action-layer changes."** v4's new code is the *action
+  layer* — the first part of AgentGuard that can *change* an agent's
+  configuration instead of only reading and scoring it:
+  `remediation_templates.py` (the three allowlisted change shapes),
+  `approval.py` and `proposal_hash.py` (human approval bound to a hash),
+  `verifier.py` (isolated re-scan), `github_plan.py` (dry-run branch/PR
+  commands), `rollback.py`, `workflow.py` (the state machine), and
+  `audit_db.py` (the SQLite event log). None of these exist yet. Putting
+  them on `v4-development` matters more than it did for v3's read-only
+  work: a bug in read-only discovery returns bad data, but a bug in the
+  action layer could alter a (synthetic) configuration, so the
+  known-good fallback has to be one command away —
+  `git checkout main`.
+- **What was done.** Created branch `v4-development` off `main`, then
+  committed the Day 1 orientation work as the baseline commit:
+  `notes/learning_log.md` (the Day 1 Lab 1–4 entries) plus the three
+  Day 1 prompt files that were adjusted for this environment
+  (`prompts/course_labs/day01_lab02…`, `day01_lab03…`, `day01_lab04…` —
+  a project-path correction, and the Lab 2 current-state override note).
+  Commit message: `Complete Day 1 setup: V4 orientation and prompt
+  adjustments`. `main` still points at `f813e24` — untouched — and no
+  tag or push was made.
+- **What is deliberately NOT in this commit.** `README.md`,
+  `START_HERE.md`, `VERSION.txt`, and `docs/roadmap.md` still describe v3
+  as shipped. v2 and v3 flipped those strings during their Day 1; this v4
+  run is keeping them until a later lab (a full-doc re-orientation would
+  break `tests/test_docs_consistency.py`, which still asserts v3
+  language). So the baseline commit records exactly what Day 1 produced —
+  the learning log and the prompt adjustments — and nothing it did not.
+- **New terms:**
+  - **Commit** — a permanent snapshot of the staged files plus a message.
+  - **Branch** — a movable pointer to a commit; commits on one branch
+    don't affect any other.
+  - **Staging** — choosing exactly which changed files go into the next
+    commit (`git add <path>`), rather than committing everything.
+  - **Baseline commit** — a checkpoint marking "this known state is
+    complete/verified," used as a restore point before riskier work.
+  - **`HEAD`** — the pointer to the commit (and branch) you currently
+    have checked out.
+  - **`git checkout -b <name>`** — create a new branch and switch to it
+    in one step.
+  - **Working tree clean** — no uncommitted changes; `git status` shows
+    nothing.
+  - **Feature branch** — a branch holding one coherent body of new work
+    (here, the whole v4 action layer), kept off `main` until it is ready.
+- **Input / processing / output / security boundary.** Input: the four
+  uncommitted Day 1 working-tree changes. Processing: `git checkout -b`,
+  `git add` for the four named files, `git commit`. Output: one new
+  commit on the new `v4-development` branch. Security boundary: local git
+  only — no `git push`, no remote, no pull request, no tag, no network,
+  no secret. The commit contents are documentation and prompt text; there
+  is no `.env`, key, or credential in it, and the learning-log changes
+  are purely additive.
+- **Why this lab exists.** Day 2 onward starts writing code that can
+  change things. Recording the pre-action-layer state as a labelled,
+  restorable checkpoint now means any later mistake can be undone with
+  `git checkout main` or a branch reset, instead of trying to reconstruct
+  by hand which edits to reverse.
+- **What this lab did not do.** No `git push`, no remote, no pull
+  request, no tag. No edit to `README.md` / `START_HERE.md` /
+  `VERSION.txt` / `CLAUDE.md` / `docs/roadmap.md`. No product or test
+  code, and no new automated test (no executable behaviour changed).
+
+## Day 1, Lab 5 — Run all v1–v3 release gates
+
+- **The idea.** A regression is previously-correct behaviour breaking
+  because of a later, often unrelated change. Running the full inherited
+  quality gate *before* any v4 action-layer code exists records — with a
+  timestamp — that today's starting point is entirely green. Anything
+  that breaks later in v4 can then only be blamed on what v4 changed, not
+  on a pre-existing fault.
+- **What the gate runs.** `python scripts/run_release_gate.py` chains
+  five checks, fail-fast (the first to exit non-zero stops the run), and
+  prints its single pass line only if all five succeed:
+  1. `scripts/validate_starter_kit.py` — the course scaffolding is
+     intact: 80 lab headings in `docs/lab_execution_index.md`, every
+     referenced prompt file present, no author machine-paths in any
+     tracked text file, and the MCP server still exposes exactly the five
+     read-only tools (source-inspected, no server started).
+  2. `python -m pytest -q` — all 230 v1 + v2 + v3 unit tests.
+  3. `python evals/run_v2_evals.py` — v2's grounded-analyst evaluation
+     matrix, forced into mock mode (no API key needed).
+  4. `python evals/run_v3_evals.py` — v3's six-category security
+     evaluation suite (path traversal, symlink escape, malformed input,
+     prompt injection, capability expansion, byte-for-byte integrity).
+  5. `python scripts/check_no_secrets.py` — no key-shaped strings in any
+     text file.
+  Result today: `230 passed`, both eval suites pass,
+  `SECRET CHECK PASS`, and the run ends
+  `RELEASE GATE PASS for AgentGuard v4`.
+- **The one change this lab made.** The gate was inherited from v3 and
+  ended `RELEASE GATE PASS for AgentGuard v3`. Two edits:
+  - `scripts/run_release_gate.py` — `PASS_MESSAGE` (and the docstring)
+    now name **v4**. This is the gate declaring which release it now
+    guards; it does not change *what* it checks.
+  - `tests/test_run_release_gate.py` — `test_pass_message_names_v3`
+    became `test_pass_message_names_v4` and asserts the new string.
+    Executable behaviour changed (the gate prints a different final
+    line), so the test that pins that line changed in the same edit —
+    never one without the other.
+  The `COMMANDS` list was left exactly as it was: v4 must still pass
+  every v1–v3 check, and there is no v4 evaluation suite yet
+  (`evals/run_v4_evals.py` is built later in the course).
+- **Why the doc strings still say "v3".** `README.md`, `START_HERE.md`,
+  and two other docs still contain `RELEASE GATE PASS for AgentGuard v3`,
+  and `tests/test_docs_consistency.py` currently requires that. Those get
+  re-oriented to v4 in the Day 10 documentation lab; changing them now
+  would break that test. The gate's own output is what this lab's passing
+  criterion measures, and that now says v4.
+- **"Prove remediation starts from a stable discovery and analysis
+  platform."** v1's deterministic scanner, v2's grounded analyst, and
+  v3's read-only MCP boundary are all still green under this gate. v4's
+  action layer is only ever allowed to build *on top of* that proven
+  platform — the gate is how "proven" is kept an evidenced fact rather
+  than an assumption.
+- **New terms:**
+  - **Regression** — previously-working behaviour breaking due to a
+    later change.
+  - **Regression suite** — the fixed set of automated tests re-run after
+    every change specifically to catch that.
+  - **Evaluation (eval)** — a check with a known-correct answer, used to
+    judge output *quality* (e.g. an AI explanation), not just whether
+    code runs.
+  - **Release gate** — the combined checkpoint (scaffolding validation +
+    unit tests + evals + secret scan) that must fully pass before a state
+    is called verified.
+  - **Fail-fast** — stop at the first failing step instead of running the
+    rest.
+  - **Secret scan** — an automated search for accidentally committed
+    credentials.
+  - **Baseline / known-good state** — a recorded "everything passed here"
+    point that later work is measured against.
+- **Input / processing / output / security boundary.** Input: the
+  committed repo state on `v4-development`. Processing: the gate script
+  runs the five checks as subprocesses, fail-fast. Output: console text
+  ending in `RELEASE GATE PASS for AgentGuard v4` (plus git-ignored
+  pytest/eval caches). Security boundary: every check is deterministic
+  and offline — the evals are forced into mock mode, no API key is read,
+  no network call is made, no secret is touched, and nothing is staged or
+  committed.
+- **Why this lab exists.** Remediation you can trust has to start from a
+  platform you have *proven* is stable. This lab turns "the inherited
+  code still works" from an assumption into a reproducible, timestamped
+  result before v4 changes anything.
+- **What this lab did not do.** No product or MCP code change, no
+  evaluation suite added, no change to the gate's list of checks. No edit
+  to `README.md` / `START_HERE.md` / `VERSION.txt` / `CLAUDE.md` /
+  `docs/roadmap.md`. No git commit, tag, push, or pull request.
+
+## Day 1, Lab 6 — Learn proposal, diff, hash, approval, verification, PR, and rollback
+
+- **The idea.** "Safe agentic action" means an automated system may
+  *propose* a change, but a human authorises it, software proves it
+  correct, and every step is recorded and reversible. This lab learns the
+  vocabulary as pure concepts — no code — so the Day 3–8 build labs can
+  implement each piece without re-explaining what it is for. The terms
+  are grounded against the real v4 design in
+  `docs/v4_state_machine.md` and `docs/v4_threat_model.md` (read as
+  reference, not copied), plus `docs/v3_to_v4_handoff.md` for why the
+  write capability is a separate governed workflow and not a sixth tool
+  on the read-only MCP server.
+- **New terms:**
+  - **Proposal (RemediationProposal)** — one specific, bounded change to
+    one agent: which allowlisted template it uses, the target agent, the
+    exact field edits, the finding it addresses, the risk score it
+    *predicts* the change will produce, and the hash of the source
+    environment it was built from.
+  - **Diff** — the exact before→after difference the proposal represents;
+    the concrete thing a human reviews, rather than a vague description.
+  - **Canonical JSON** — serialising data with sorted keys and fixed
+    separators so the same content always produces byte-for-byte
+    identical output, no matter how it was assembled.
+  - **Hash (SHA-256)** — a fixed-length fingerprint computed from those
+    canonical bytes. Any change to the input, however small, produces a
+    completely different hash. v4 hashes both the exact source
+    environment and the exact proposal.
+  - **Approval (ApprovalRecord)** — a recorded human decision, approve or
+    reject, bound to the proposal hash *and* the source hash, together
+    with the reviewer, a reason, and a timestamp. It is evidence of who
+    agreed to exactly what.
+  - **Stale approval** — an approval whose bound proposal hash or source
+    hash no longer matches the current data. It is automatically rejected,
+    forcing a fresh human review; an old approval can never be silently
+    reused for a changed proposal.
+  - **Verification** — software re-checking *correctness* after a human
+    has approved *intent*. The verifier applies the approved, unmodified
+    proposal to an isolated temporary copy of the environment, re-runs
+    v1's scanner there, and confirms the result: the predicted state was
+    produced, exactly one target was touched, only allowlisted keys
+    changed, the data still serialises, and the HIGH-risk count did not
+    go up.
+  - **State machine / transition / terminal state** — the fixed, ordered
+    set of stages a remediation moves through —
+    `DISCOVERED → SCANNED → PROPOSED → APPROVED → VERIFIED →
+    DRAFT_PR_CREATED → ROLLED_BACK` — plus the dead-end states
+    `REJECTED` and `FAILED`. A *transition* is one allowed step between
+    states; skipping a state (e.g. PROPOSED straight to VERIFIED) is
+    rejected. A *terminal state* is one with no exit.
+  - **Pull request (PR)** — a proposed set of commits submitted for
+    review before being merged into a branch.
+  - **Draft PR** — a PR explicitly marked not-ready. It cannot be merged
+    until taken out of draft, so a v4 change always begins in review
+    state and never merges itself.
+  - **Dry-run** — producing and printing the exact commands that *would*
+    run, while changing nothing. This is the default mode for v4's GitHub
+    plan; live execution is a separate, explicit opt-in.
+  - **Rollback** — a stored way to reverse a change. Before a merge:
+    close the draft PR and delete its branch. After a merge: v4
+    *refuses* to roll back automatically, because that would silently
+    rewrite shared history — it requires a deliberate, reviewed revert
+    instead.
+  - **Audit event** — one durable row, written to a local SQLite
+    database, for every transition: what field changed, from what value
+    to what value, which human approved it against which hash, whether it
+    verified, whether it was rolled back.
+  - **Fail closed** — when any required check fails, the workflow stops
+    in a terminal state (`REJECTED` or `FAILED`) rather than continuing
+    with partial results.
+- **The invariant that must survive.** Deterministic rules decide *what*
+  to propose; software verifies whether the applied change is correct; a
+  human approves *intent*. The AI layer may explain a finding and propose
+  a remediation, exactly as v2's analyst explains a score — it may never
+  approve, apply, verify, or score. v1's `scanner.py` remains the sole
+  authority for the risk number: a proposal *predicts* a score, it never
+  *sets* one.
+- **Input / processing / output / security boundary.** Input: the v4
+  starter-kit design docs and the v3→v4 handoff. Processing: a human
+  reads them and writes this glossary. Output: this learning-log entry.
+  Security boundary: documentation only — no code written, no file
+  created, no package installed, no network call, no secret touched, no
+  git commit. The files this lab is *about*
+  (`approval.py`, `proposal_hash.py`, `verifier.py`, and their tests) do
+  not exist yet and were not created here; they are the deliverables of
+  the Day 3, Day 4, and Day 6 labs.
+- **Note on this lab's verification command.** The lab lists
+  `python -m pytest -q tests/test_approval.py tests/test_proposal_hash.py
+  tests/test_verifier.py`. On Day 1 those test files do not exist, so the
+  command reports "file or directory not found" and exits non-zero. That
+  is the correct state for this point in the course, not a failure — no
+  behaviour changed in this lab, so there are no failed tests for it. The
+  full existing suite still reports `230 passed`.
+- **Why this lab exists.** Every later v4 lab leans on these seven terms.
+  Defining them once, precisely, against the actual design means those
+  labs argue about implementation details rather than about what the
+  words mean.
+- **What this lab did not do.** Created none of `approval.py`,
+  `proposal_hash.py`, `verifier.py` or any test file; wrote no product or
+  MCP code; installed no package. No edit to `README.md` /
+  `START_HERE.md` / `VERSION.txt` / `CLAUDE.md` / `docs/roadmap.md`. No
+  git commit, tag, push, or pull request.
+
+## Day 1, Lab 7 — Draw the v4 state machine and trust boundaries
+
+- **The idea.** v3's Day 1 trust-boundary lab drew where *incoming
+  data* becomes trusted. v4 can *act* — change a synthetic agent
+  configuration — so the design has to answer a second question: at each
+  stage of the remediation workflow, what data does the system hold, what
+  is it *allowed to do* with it, and what specific check must pass before
+  it is allowed to do more. Drawing the states and the allowed
+  transitions on paper first — before `workflow.py` exists — forces every
+  one of those answers to be explicit. The full diagram, per-state table,
+  and boundary list are in `docs/v4_architecture.md` (created this lab).
+- **The state machine.**
+  `DISCOVERED → SCANNED → PROPOSED → APPROVED → VERIFIED →
+  DRAFT_PR_CREATED → ROLLED_BACK`, with `REJECTED` and `FAILED` as
+  alternate terminal states. Two rules hold everywhere: skipping a state
+  is rejected (each transition checks its exact predecessor), and an
+  approval cannot be reused once the source or proposal hash changes.
+- **Data vs. authority, state by state.**
+  - `DISCOVERED` / `SCANNED` — read-only; the score is set by v1's
+    scanner and then fixed.
+  - `PROPOSED` — the system now holds one bounded proposal; it may
+    *describe* the change and the AI may *explain* it, but it cannot
+    apply anything.
+  - `APPROVED` — a human `ApprovalRecord` (bound to the proposal hash
+    *and* the source hash) is on record; the system still cannot touch
+    any real configuration.
+  - `VERIFIED` — the proposal has been applied to an isolated temp copy
+    and re-scanned, and every check passed (predicted score, one target,
+    allowlisted keys only, HIGH count not increased).
+  - `DRAFT_PR_CREATED` — a proposed change exists on the separate
+    synthetic demo repo as a draft PR that cannot merge itself.
+  - `ROLLED_BACK` — the draft PR is closed and its branch deleted;
+    automatic rollback *after* a merge is refused.
+  - `REJECTED` / `FAILED` — terminal, no authority, fail closed.
+- **New terms:**
+  - **State** — one named stage; the workflow is in exactly one at a
+    time per remediation.
+  - **Transition** — one allowed step between two states; only the drawn
+    arrows are permitted.
+  - **Terminal state** — a state with no exit (`REJECTED`, `FAILED`,
+    `ROLLED_BACK`).
+  - **State-skipping** — attempting an undrawn transition; rejected.
+  - **Authority** — what the system may *do* in a state, distinct from
+    what data it *holds*.
+  - **Trust boundary (restated for v4)** — a point where authority
+    increases, so a named check must gate the transition.
+- **The six trust boundaries.** (1) the v3 data boundary, unchanged;
+  (2) the score boundary — only v1's scanner sets a score, a proposal
+  predicts one; (3) approval; (4) verification; (5) GitHub
+  (allowlist + dry-run default + draft-only, no merge command anywhere);
+  (6) rollback (auto-reversal only before merge).
+- **How this differs from v3's trust-boundary lab.** v3 had two
+  boundaries — protocol and data — both about untrusted input arriving.
+  v4 keeps those and adds four more, all about *outgoing action*:
+  approval, verification, GitHub, rollback. The direction of risk
+  flipped, from "bad data comes in" to "a wrong change goes out".
+- **What is not in the machine.** The MCP discovery server — still five
+  read-only tools, no write tool. The action layer is a separate
+  workflow so v3's server stays provably read-only; reasoning in
+  `docs/v3_to_v4_handoff.md`.
+- **The invariant.** Unchanged from v1: only v1's `scanner.py` sets the
+  risk score. Deterministic rules decide what to propose, software
+  verifies correctness, a human approves intent, the AI explains and
+  proposes only.
+- **Input / processing / output / security boundary.** Input: the v4
+  starter-kit design docs (`v4_architecture.md`, `v4_state_machine.md`,
+  `v4_threat_model.md`) and this repo's `docs/v3_architecture.md`
+  template and `docs/v3_to_v4_handoff.md`. Processing: a human draws the
+  diagram and the per-state table. Output: `docs/v4_architecture.md` plus
+  this entry. Security boundary: documentation only — no code, no
+  `workflow.py`, no package installed, no network call, no secret, no git
+  commit. The diagram describes boundaries that later labs enforce in
+  code; it enforces nothing itself.
+- **Note on this lab's verification command.** It lists
+  `python -m pytest -q tests/test_workflow.py`. That file does not exist
+  yet — `workflow.py` and its tests are Day 5 deliverables — so the
+  command reports "file or directory not found". Correct for Day 1; no
+  behaviour changed in this lab. The full suite still reports
+  `230 passed` and the release gate still ends
+  `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** The states and boundaries are the skeleton
+  every Day 3–8 lab hangs code on. Deciding them once, on paper, means
+  those labs implement an agreed design instead of inventing the control
+  flow piecemeal.
+- **What this lab did not do.** Did not create `workflow.py`,
+  `tests/test_workflow.py`, or `docs/v4_state_machine.md` (Day 5). Wrote
+  no product or MCP code. No edit to `README.md` / `START_HERE.md` /
+  `VERSION.txt` / `CLAUDE.md` / `docs/roadmap.md`. No git commit, tag,
+  push, or pull request.
+
+## Day 1, Lab 8 — Create Day 1 evidence and a no-production pledge
+
+- **The idea.** Day 1 built no application, so "setup done" is not
+  something you can screenshot. This lab turns Day 1 into things that can
+  be re-checked: four reproducible proof points in `evidence/README.md`
+  (each a command plus its exact expected output), a one-line-per-lab
+  Day 1 summary in this log, and — new for v4 — a written
+  **no-production pledge**.
+- **The four Day 1 proof points** (full text in `evidence/README.md`):
+  1. the branch and baseline commit — `git log --oneline --all
+     --decorate` shows `main` at `f813e24` and `v4-development` at
+     `517db77`;
+  2. the release gate — `python scripts/run_release_gate.py` ends
+     `RELEASE GATE PASS for AgentGuard v4`;
+  3. the design — `docs/v4_architecture.md`, the state machine and
+     trust-boundary table;
+  4. this learning log and its Day 1 summary.
+- **The no-production pledge.** An affirmative, checklist-style statement
+  of what v4's change capability will and will not touch: synthetic data
+  only; a dedicated private demo repository, never production and never
+  the AgentGuard source repo, with repo/branch/path allowlisted; draft
+  pull requests only, no merge command anywhere; dry-run by default;
+  verification on isolated temp copies only; the MCP server stays
+  read-only; no autonomous remediation (a hash-bound human approval gates
+  every applied change); v1's scanner stays the sole score authority;
+  live steps are the user's to run with a test account. Writing it down
+  matters because a documented pledge is one an auditor or interviewer
+  can hold the project to — later labs enforce each item in code.
+- **New terms:**
+  - **Evidence package** — a set of re-runnable checks (command +
+    expected result), not prose claims.
+  - **Reproducible proof point** — one such check: exactly what to run
+    and exactly what you should see.
+  - **No-production pledge** — a documented commitment about the scope
+    and safety limits of a system's ability to act.
+  - **Synthetic data** — data fabricated for testing, never real
+    customer or infrastructure data.
+  - **Dedicated test account / repository** — an isolated, throwaway
+    target created only for a demo, never shared with or pointed at
+    production.
+  - **Draft-only** — changes that are published for review but cannot
+    merge themselves.
+- **Input / processing / output / security boundary.** Input: Day 1's
+  actual outcomes (the commit, the gate result, `docs/v4_architecture.md`,
+  this log) and the v4 design docs. Processing: a human writes each proof
+  point and the pledge. Output: two appended sections in
+  `evidence/README.md` and two appended entries in this log. Security
+  boundary: documentation only — no code, no commit, no network, no
+  secret. Every screenshot the evidence doc asks for must show synthetic
+  data only and no `.env`, key, or token.
+- **Why this lab exists.** An unverifiable "setup complete" is worth
+  nothing to a reviewer. Four commands anyone can re-run, plus a pledge
+  the rest of the course is built to keep, is worth something.
+- **What this lab did not do.** No code, no test file, no `workflow.py`.
+  No edit to `README.md` / `START_HERE.md` / `VERSION.txt` / `CLAUDE.md` /
+  `docs/roadmap.md`. No git commit, tag, push, or pull request.
+
+## Day 1 Summary — Labs 1 through 8
+
+A one-line takeaway per lab, so this log reads as one record instead of
+eight separate entries someone has to piece together.
+
+1. **Understand the v4 problem and finish line** — v1–v3 can find and
+   explain risk but a human still fixes it by hand; v4 adds a *governed*
+   way to propose and apply a fix, and autonomous remediation is
+   dangerous (blast radius, prompt injection, authorization blur, weak
+   audit) — stated as a not-yet-built finish line.
+2. **Verify how v3 was preserved and v4 inherited the released baseline**
+   — v4's source is a byte-for-byte copy of released v3; `.git`, `.venv`,
+   and `.env` were deliberately not copied; v3 stays frozen and
+   restorable at tag `v3.0.0`.
+3. **Open the v4 project in all working tools** — editor/Claude Code,
+   Terminal, browser, GitHub, and Docker each have one job; GitHub now
+   also means CI and a draft-PR review seam, and Docker is added for
+   reproducible packaging.
+4. **Create the v4 branch and baseline commit** — `v4-development`
+   branched off `main` with the Day 1 orientation work committed as
+   `517db77`; `main` stayed at `f813e24`. The action layer is isolated on
+   the branch so `main` stays a one-command fallback.
+5. **Run all v1–v3 release gates** — the inherited gate passes
+   (230 tests, v2 matrix, v3 security suite, secret scan); renamed its
+   pass line to `RELEASE GATE PASS for AgentGuard v4` and updated the one
+   test that pins that string.
+6. **Learn proposal / diff / hash / approval / verification / PR /
+   rollback** — built the glossary for safe agentic action, grounded in
+   the real v4 design, with no code written.
+7. **Draw the v4 state machine and trust boundaries** — created
+   `docs/v4_architecture.md`: the seven-state workflow, the per-state
+   data/authority/gate table, and the six trust boundaries (four of them
+   about *outgoing action*, unlike v3's two incoming-data boundaries).
+8. **Create Day 1 evidence and a no-production pledge** — turned Day 1
+   into four reproducible proof points in `evidence/README.md` and a
+   written pledge that the MVP only ever touches synthetic data, a
+   dedicated demo repo, and draft changes.
+
+**Where Day 1 leaves off:** `agentguard-v3` is untouched and restorable
+at `v3.0.0`; `v4-development` holds the Day 1 baseline commit (`517db77`)
+plus everything since — the release-gate rename, `docs/v4_architecture.md`,
+and the Lab 5–8 learning-log/evidence updates are not yet committed, still
+sitting as working-tree changes. Day 2 begins GitHub setup: installing the
+`gh` CLI, authenticating through the browser (no token in any file), and
+creating the separate private demo repository that every later remediation
+lab targets — before any action-layer code is written.
+
+## Day 2, Lab 1 — Understand GitHub repository, branch, commit, push, pull request
+
+- **The idea.** GitHub's review model *is* the template for v4's
+  remediation. A pull request is a change **offered**; a merge is the
+  change **applied**; the two are deliberately separate so a human — and
+  CI — sits in between. v4's `VERIFIED → DRAFT_PR_CREATED` step produces
+  exactly that: a proposal on GitHub that only a human merge can apply.
+  The plan and safety contract for the GitHub side is the new
+  `docs/v4_github_demo_setup.md` (created this lab).
+- **New terms:**
+  - **Repository ("repo")** — a project's full file tree plus its entire
+    version history, hosted on GitHub.
+  - **Branch** — an independent line of commits within one repo; commits
+    on one don't affect another until merged.
+  - **Commit** — one permanent, message-labelled snapshot of staged
+    changes.
+  - **Push** — uploading local commits to the GitHub-hosted copy (the
+    *remote*, usually `origin`) so others and CI can see them. A push by
+    itself changes nothing anyone depends on.
+  - **Pull request (PR)** — a request to merge one branch into another,
+    shown as a reviewable diff with discussion, required reviewers, and
+    status checks.
+  - **Draft PR** — a PR explicitly marked not-ready; it cannot be merged
+    until undrafted.
+  - **Merge** — actually applying a PR's commits to the target branch.
+    This is the step that makes a change real.
+  - **Diff** — the line-by-line view of what a commit or PR changes.
+  - **Status check / CI** — automated tests GitHub runs on a PR that must
+    pass before it can merge.
+  - **Remote / `origin`** — the named link to a repo hosted elsewhere;
+    `git push`/`pull` move commits between local and remote.
+- **Proposal vs. applied change.** Before merge, a PR is fully
+  inspectable (the diff), gated (reviewers + CI), and reversible (close
+  it). After merge, the change is in the branch's history. v4 keeps its
+  remediation permanently on the "before merge" side: draft-only PRs, no
+  merge command anywhere in the code, and a dry-run default that prints
+  the commands without running them.
+- **What Day 2 sets up.** `docs/v4_github_demo_setup.md` lays out the
+  sequence: install `gh` (Lab 2), authenticate via browser OAuth so the
+  token lives in `~/.config/gh/` and never in a project file (Lab 3),
+  create a separate **private** repo of synthetic files (Lab 4), clone it
+  to a **sibling** directory outside this repo (Lab 5), add a PR template
+  and branch-name rule (Lab 6), practise one manual draft PR (Lab 7), and
+  record the exact `owner/repo` + branch prefix + target file path as
+  plain, secret-free configuration (Lab 8).
+- **What was inspected but not changed.**
+  - `.gitignore` already excludes `.env` and `.env.*` (keeping
+    `!.env.example`), `*.bak`, `*.jsonl`, and `.claude/`. The `gh` CLI
+    stores its token in `~/.config/gh/`, outside the repo, and the demo
+    repo is cloned to a sibling directory — so there is nothing new to
+    ignore. Left unchanged.
+  - `CLAUDE.md`'s safety boundaries already require synthetic data and
+    dedicated test repositories and forbid real accounts — that already
+    covers GitHub work. An "understand" lab does not rewrite project
+    instructions. Left unchanged.
+- **Input / processing / output / security boundary.** Input: the v4
+  design docs and GitHub's own review model. Processing: a human writes
+  the glossary and the setup plan. Output: `docs/v4_github_demo_setup.md`
+  plus this entry. Security boundary: documentation only — nothing
+  installed, no `gh`, no authentication, no network call, no remote
+  added, no secret, no git commit.
+- **Note on this lab's verification command.** It lists
+  `python -m pytest -q tests/test_github_plan.py`. That file does not
+  exist yet — `github_plan.py` and its tests are Day 7 deliverables — so
+  the command reports "file or directory not found". Correct for Day 2;
+  no behaviour changed in this lab. The full suite still reports
+  `230 passed` and the release gate still ends
+  `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** Every later GitHub lab, and v4's whole
+  remediation output, depends on one idea: a reviewed pull request is a
+  proposal, not an applied change. Stating that — and the demo's
+  allowlist and draft-only rules — before installing any tool means the
+  setup labs are executing an agreed safety design, not improvising it.
+- **What this lab did not do.** Installed no `gh` / Homebrew package,
+  authenticated nothing, created no repo or remote, opened no PR. Did not
+  create `github_plan.py` or `tests/test_github_plan.py` (Day 7). No edit
+  to `.gitignore`, `CLAUDE.md`, `README.md`, `START_HERE.md`,
+  `VERSION.txt`, or `docs/roadmap.md`. No git commit, tag, or push.
+
+## Day 2, Lab 2 — Install and verify the GitHub CLI
+
+- **The idea.** `gh` is GitHub's official command-line tool: one program
+  that does repositories, branches, pull requests, and authentication
+  from the terminal. Using it gives v4 "controlled" access to GitHub in
+  two senses — every GitHub action is a named `gh` subcommand a reviewer
+  can read (`gh pr create --draft`, `gh repo view`), and the credential
+  is handled by `gh` itself (a browser OAuth token in `~/.config/gh/`,
+  Lab 3) rather than a raw token pasted into a script. v4's Day 7
+  `github_plan.py` will emit `gh` commands as its dry-run plan, so `gh`
+  has to be present first.
+- **New terms:**
+  - **CLI** — a program driven by typed commands.
+  - **`gh` (GitHub CLI)** — GitHub's official CLI for repos, PRs, and
+    auth.
+  - **Homebrew formula** — Homebrew's install recipe for one package.
+  - **Bottle** — a pre-built binary Homebrew installs directly instead of
+    compiling.
+  - **PATH** — the ordered list of folders the shell searches for a bare
+    command; Homebrew symlinks `gh` into one (`/opt/homebrew/bin`).
+  - **`gh --version` vs. `gh auth status`** — a *capability* check ("is
+    the tool here, which version") versus an *identity* check ("who am I
+    logged in as"). This lab does only the first.
+- **Machine-wide action, flagged.** Same note v3 made for
+  `brew install node`: this reaches outside `agentguard-v4` onto the
+  whole machine, `CLAUDE.md` requires approval for package installs, and
+  approval was given. The user ran the install; I did not.
+- **Before / after.**
+  | | Before (Lab 1) | After (Lab 2) |
+  |---|---|---|
+  | `gh --version` | `command not found` | `gh version 2.98.0 (2026-08-20)` |
+  | `which gh` | (nothing) | `/opt/homebrew/bin/gh` |
+  | `gh auth status` | n/a | `not logged into any GitHub hosts` — correct, auth is Lab 3 |
+- **Input / processing / output / security boundary.** Input: the lab's
+  install commands (`brew install gh`, `gh --version`). Processing:
+  Homebrew fetched and linked the `gh` bottle and its dependencies.
+  Output: `gh` runnable on PATH, plus the version recorded in
+  `docs/v4_github_demo_setup.md` and this entry. Security boundary: a
+  real Homebrew network + filesystem change, but scoped to one vetted
+  formula — no `sudo`, no GitHub authentication, no token, no cost, no
+  project code changed, no `.env` touched, no git commit. Nothing
+  `gh`-related appears inside the repo (its config lives in
+  `~/.config/gh/`).
+- **What was inspected but not changed.** `.gitignore` and `CLAUDE.md` —
+  still adequate: the `gh` token is stored outside the repo, and
+  `CLAUDE.md` already requires synthetic data and dedicated test repos.
+- **Why this lab exists.** Every later GitHub lab and the Day 7 plan
+  generator need `gh` on the machine. Installing it and checking only the
+  version — in isolation, before any authentication — keeps that external
+  dependency explicit and verifiable.
+- **What this lab did not do.** No `gh auth login`, no token, no
+  repository, no remote, no PR. No `github_plan.py`. No edit to
+  `.gitignore` / `CLAUDE.md` / `README.md` / `START_HERE.md` /
+  `VERSION.txt` / `docs/roadmap.md`. No git commit, tag, or push.
+
+## Day 2, Lab 3 — Authenticate the GitHub CLI through the browser
+
+- **The idea.** There are two ways to give a tool GitHub access. A
+  *personal access token* is a long secret you generate on GitHub and
+  paste into a config file or environment variable — now a credential
+  sits in a file that can be committed, synced, or leaked. `gh auth
+  login` instead runs an **OAuth web flow**: `gh` prints a one-time code,
+  opens `github.com/login/device`, you approve the access in GitHub's own
+  UI, and GitHub hands `gh` a scoped token that `gh` stores itself. On
+  this machine it went into the **macOS keyring** — not even a file. The
+  repository never contains a credential.
+- **What the login actually did.**
+  ```
+  ✓ Logged in as justintinlei
+  ```
+  and `gh auth status` reports: account `justintinlei` on `github.com`,
+  Git protocol HTTPS, token held in the keyring and shown only as
+  `gho_************`, scopes `gist, read:org, repo, workflow`.
+- **New terms:**
+  - **OAuth** — a standard for letting one app act on GitHub for you
+    without you handing it your password.
+  - **Authentication** (proving who you are) vs. **authorization** (what
+    you're allowed to do) — the login proves identity; the token scopes
+    set the permissions.
+  - **Web / browser flow** — approving the access in a browser tab
+    instead of pasting a secret.
+  - **One-time code** — the short code `gh` shows (`A1BF-6799` here) that
+    you type into the device-login page to tie the browser approval to
+    this `gh`.
+  - **Access token** — the scoped secret `gh` receives and stores; used
+    automatically for pushes via the **credential helper**.
+  - **Token scopes** — the exact permission set the token carries
+    (`repo`, `read:org`, …); not secret, so the app panel keeps them.
+  - **Keyring** — the OS's encrypted secret store; `gh` uses it here in
+    preference to `~/.config/gh/hosts.yml`.
+- **The minimal `app_v4.py` (created this lab).** The first slice of the
+  v4 page: a `BOUNDARY_NOTES` list shown on screen, and a **GitHub CLI
+  authentication** panel. The panel calls `github_auth_status()`, which
+  shells out to `gh auth status` and returns `{gh_installed,
+  authenticated, summary}` — with any line containing `Token:` stripped
+  as defence in depth on top of `gh`'s own masking. The app proves GitHub
+  access works **while holding no credential itself**: it asks `gh`, it
+  never reads the token. `render()` runs only under the `__main__` guard,
+  so `import app_v4` (the tests) has no side effects.
+- **The test (`tests/test_app_v4.py`, 5 cases).** The source compiles;
+  `BOUNDARY_NOTES` state the pledge; `github_auth_status()` drops a
+  fake `Token: gho_…` line while keeping the account and scopes;
+  a missing `gh` is handled without an exception; `render()` is guarded.
+- **Input / processing / output / security boundary.** Input: the user's
+  `gh auth login` in the browser. Processing: `gh` completed the OAuth
+  flow and wrote its own config (into the keyring); `app_v4.py` reads
+  `gh auth status`. Output: `app_v4.py`, `tests/test_app_v4.py`, and the
+  "Authenticate" row of `docs/v4_github_demo_setup.md`. Security
+  boundary: the token never enters the repo, never appears in the app UI
+  (the `Token:` line is stripped), never in this log, never in chat. No
+  git commit.
+- **What was inspected but not changed.** `.gitignore` and `CLAUDE.md` —
+  the token is outside the repo (keyring), and `CLAUDE.md` already
+  requires synthetic data and dedicated test repos. Nothing to add.
+- **Why this lab exists.** Every later GitHub lab pushes and opens PRs as
+  this account. Doing the login through OAuth — and proving with a real
+  UI panel that the app can see the auth state without the secret —
+  establishes that AgentGuard never has to store a GitHub credential.
+- **What this lab did not do.** Created no repository (Lab 4), no clone
+  (Lab 5), no remote, no pull request, no `github_plan.py`. Added no
+  proposal/approval/verify UI to `app_v4.py` (Day 9). No edit to
+  `.gitignore` / `CLAUDE.md` / `README.md` / `START_HERE.md` /
+  `VERSION.txt` / `docs/roadmap.md`. No git commit, tag, or push.
+
+## Day 2, Lab 4 — Create a separate private remediation demo repository
+
+- **The idea.** v4's remediation workflow ends by pushing a branch and
+  opening a draft pull request — that has to land in a real GitHub
+  repository. This lab decides which one, *before* any code can push
+  anywhere, and it is a disposable private sandbox: only synthetic files,
+  deletable and recreatable at will.
+- **Why never the AgentGuard source repository.** The remediation code
+  lives in *this* repo. If the workflow targeted this repo, a bug in that
+  code could rewrite AgentGuard's own history, and a prompt-injection
+  string that reached the GitHub step could aim a change at the tool
+  itself. Keeping the *target* repo separate from the *source* repo makes
+  "what can the workflow touch" a one-line, checkable answer.
+- **Why never production.** A wrong change pushed to a real agent
+  registry is exactly the failure v4 exists to prevent. The demo repo
+  lets the whole propose → approve → verify → draft-PR mechanism be shown
+  end to end with zero real blast radius.
+- **New terms:**
+  - **Private repository** — visible only to the owner and invited
+    collaborators; `--private` on `gh repo create`.
+  - **Sandbox / throwaway repo** — a target you can freely break, delete,
+    and recreate because nothing depends on it.
+  - **`gh repo create <owner>/<name>`** — the CLI call that creates a
+    repo through GitHub's API as the authenticated user.
+  - **`--add-readme`** — seed the new repo with one README commit so it
+    has a default branch and clones cleanly (no "empty repository"
+    warning in Lab 5).
+  - **Repository allowlist** — the fixed list (one repo, later one branch
+    prefix, one file path) that `github_plan.py` will enforce so the
+    workflow cannot target anything else.
+  - **Blast radius** — how much can be damaged by one mistake; a private
+    demo repo's is "delete it and run the lab again".
+  - **Source repo vs. target repo** — where the tool's code lives vs.
+    where its output goes; deliberately different repositories.
+- **What was created.** `justintinlei/agentguard-remediation-demo` —
+  private, default branch `main`, one README commit, no other content.
+  URL `https://github.com/justintinlei/agentguard-remediation-demo`. It
+  is now recorded as the single repository in the allowlist section of
+  `docs/v4_github_demo_setup.md`; the branch prefix (Lab 6) and target
+  file path (Lab 8) are still to be decided. Synthetic agent data is
+  added in Lab 5.
+- **Input / processing / output / security boundary.** Input: the chosen
+  repo name. Processing: `gh repo create` called GitHub's API as
+  `justintinlei`. Output: one new private, near-empty repo on GitHub,
+  plus the two doc updates in this repo. Security boundary: a real
+  external action on the user's GitHub account, but scoped to creating
+  one private repo — no data pushed, no secret, no production system
+  touched, and **nothing committed in this repo** (the demo repo is
+  entirely separate; `git status` here shows only the doc edits).
+- **What was inspected but not changed.** `.gitignore` — the demo repo is
+  its own git repository and will be cloned to a *sibling* directory in
+  Lab 5, so there is nothing for this repo's `.gitignore` to exclude.
+  `CLAUDE.md` — already requires synthetic data and dedicated test
+  repositories.
+- **Why this lab exists.** "The workflow only ever writes to this one
+  private synthetic repo" is a security property. Making it true starts
+  with actually creating that repo and writing its name down, so Day 7's
+  allowlist has a concrete value to enforce.
+- **What this lab did not do.** Did not clone the repo or add any data
+  (Lab 5), add a PR template or branch rule (Lab 6), finalise the
+  allowlist (Lab 8), or write `github_plan.py` (Day 7). No push from this
+  repo, no pull request, no merge. No edit to `.gitignore` / `CLAUDE.md`
+  / `README.md` / `START_HERE.md` / `VERSION.txt` / `docs/roadmap.md`. No
+  git commit, tag, or push here.
+
+## Day 2, Lab 5 — Clone the demo repository and add synthetic agent data
+
+- **The idea.** A remediation in v4 is not an API call to a live system —
+  it is a **diff to a file under version control**, opened as a draft pull
+  request. So the demo repo needs the file that stands in for "an agent's
+  configuration". This lab clones the demo repo and adds
+  `connected_environment/agents.json`: a synthetic 3-agent registry that
+  is the "before" state a later remediation will propose changing. Once
+  that file exists, the entire propose → approve → verify → draft-PR
+  workflow can be demonstrated with no real system anywhere in the loop.
+- **What was done (in the demo repo, not here).**
+  ```
+  git clone https://github.com/justintinlei/agentguard-remediation-demo
+  # into ~/Developer/AgentGuard/01-Working/agentguard-remediation-demo (a sibling dir)
+  cp .../agentguard-v4/connected_environment/agents.json connected_environment/agents.json
+  git add / commit / push   ->  e147248 on main
+  ```
+  The demo repo now holds `README.md` + `connected_environment/agents.json`
+  and nothing else; it is still private.
+- **Why the data is a verbatim copy of this repo's synthetic registry.**
+  Two reasons: it is already synthetic, and it already contains the three
+  fixable violations the remediation templates target — `Customer Support
+  Agent` has `owner: ""` and `human_approval_required: false`;
+  `Deployment Agent` has broad production tools and no human approval.
+  Using the same bytes keeps the demo's before-state identical to what
+  v1's scanner sees when it scores the environment.
+- **Why a sibling directory, never inside this repo.** The demo repo is
+  its own git repository with its own history. Cloned next to (not
+  inside) `agentguard-v4`, the two `.git` directories never interact, a
+  `git` command run in one cannot affect the other, and this repo's
+  `.gitignore` needs nothing added. Cloning it *inside* would nest a repo
+  in a repo and require an ignore rule to keep it out of AgentGuard's
+  history.
+- **The allowlist takes shape.** `connected_environment/agents.json` is
+  now the recorded **target file path** — the one and only file the
+  GitHub step will ever modify (the finished `github_plan.py` rejects any
+  other path). The repository (`justintinlei/agentguard-remediation-demo`)
+  was recorded Lab 4; the branch-name prefix (`agentguard/…`) is decided
+  in Lab 6.
+- **New terms:**
+  - **Clone** — a full local copy of a remote repository, including its
+    commit history.
+  - **Working copy** — the checked-out files you edit, as opposed to the
+    `.git` history behind them.
+  - **`origin`** — the default name git gives the remote you cloned from;
+    `git push` sends commits there.
+  - **Sibling checkout** — cloning a repo next to another rather than
+    inside it, so their histories stay independent.
+  - **Target file path (allowlist)** — the single file in the demo repo
+    the remediation workflow is permitted to change.
+  - **Before-state / baseline config** — the starting configuration, with
+    its violations, that a remediation proposal later diffs against.
+- **Input / processing / output / security boundary.** Input: the empty
+  demo repo plus this repo's synthetic `connected_environment/agents.json`.
+  Processing: `git clone`, copy the file in, `git commit` + `git push` —
+  all inside the demo repo. Output: the demo repo now has
+  `connected_environment/agents.json` on `main` (`e147248`), plus the two
+  doc updates in this repo. Security boundary: every git write went to
+  the private synthetic demo repo; no secret, no production system, and
+  **nothing committed in the AgentGuard repo** — `git status` here shows
+  only the doc edits.
+- **What was inspected but not changed.** `.gitignore` and `CLAUDE.md` —
+  the sibling clone needs no ignore rule, and the synthetic-data /
+  test-repo rule already covers this.
+- **Why this lab exists.** The workflow's promise is "it only ever
+  proposes a diff to one synthetic file in one private repo." Making that
+  true starts with that file actually existing in that repo, in a known
+  before-state, so every later lab has something concrete to remediate.
+- **What this lab did not do.** Created no branch in the demo repo, no
+  pull request, no PR template (`.agentguard/pr_body.md`, Lab 6), no
+  `github_plan.py` (Lab 6 / Day 7). No git commit or push in the
+  AgentGuard repo. No edit to `.gitignore` / `CLAUDE.md` / `README.md` /
+  `START_HERE.md` / `VERSION.txt` / `docs/roadmap.md`.
+
+## Day 2, Lab 6 — Add a pull request template and branch naming rule
+
+- **The idea.** *Review metadata* is the standard packaging every proposed
+  change wears so a reviewer can assess it fast and automated rules can
+  gate it. Two pieces:
+  - a **branch naming rule** — every remediation lands on
+    `agentguard/<id>`, matching `^agentguard/[a-z0-9-]{1,60}$`;
+  - a **PR body template** — every pull request describes itself with the
+    same labelled fields and the same footer.
+  When many changes are machine-proposed, this is what makes them
+  reviewable as a batch instead of one-off puzzles. It is also a
+  **control**: a fixed `agentguard/` prefix means the workflow can never
+  push to `main` or an arbitrary branch.
+- **What was created.** The first slice of `github_plan.py` — review
+  metadata only:
+  - `SAFE_BRANCH` regex + `branch_name(workflow_id)` → returns
+    `agentguard/<lowercased id>`, raising `ValueError` if the result
+    isn't a safe branch name.
+  - `pr_title(workflow_id)` → `AgentGuard remediation <id>`.
+  - `PR_BODY_TEMPLATE` + `render_pr_body(**fields)` → the fixed body:
+    workflow id, template, target agent, finding addressed, predicted
+    score, source SHA-256, proposal SHA-256, then a constant footer
+    (draft, "AgentGuard has no merge capability", synthetic — never merge
+    to production). A missing field raises `KeyError` rather than
+    producing a body with a hole.
+  `tests/test_github_plan.py` (13 cases) covers all of it.
+- **Why each part of the branch regex matters.**
+  - `^agentguard/…$` (anchored / `fullmatch`) — the *whole* name must be
+    the pattern, so `release/agentguard/x` and trailing junk are
+    rejected.
+  - `[a-z0-9-]` — no `/`, no `..`, no whitespace, no shell
+    metacharacters in the part that comes from a workflow id; a branch
+    name can never carry a path traversal or an injection.
+  - `{1,60}` — bounded length, so an oversized id can't become a branch.
+  - the literal `agentguard/` prefix — the workflow structurally cannot
+    name a branch `main`.
+- **Why the PR template is code, not a file.** The finished plan uses
+  `gh pr create --body-file .agentguard/pr_body.md`. That path is not one
+  of this lab's relevant paths, and "do not invent a filename or folder",
+  so the template lives as a string constant now; it gets written to a
+  real file at PR-creation time on Day 7. `pr_title()`, `SAFE_BRANCH`,
+  and the body shape here are byte-identical to the final `github_plan.py`
+  so Day 7 builds `create_plan()` on top without reworking them.
+- **New terms:**
+  - **Review metadata** — the standard fields and naming attached to a
+    change so it can be reviewed and gated consistently.
+  - **Branch naming convention / prefix** — a required shape for branch
+    names (`agentguard/…`).
+  - **PR template / PR body** — the standardized description text of a
+    pull request.
+  - **`--body-file`** — the `gh pr create` flag that reads the PR body
+    from a file instead of an argument.
+  - **Branch protection rule** — a GitHub setting that blocks merging a
+    branch until conditions (review, passing checks) are met.
+  - **`.github/pull_request_template.md`** — GitHub's repo-level file that
+    auto-fills a new PR's body.
+  - **Regex anchor / `fullmatch`** — `^…$` (or Python's `fullmatch`)
+    requires the pattern to match the entire string, not a substring.
+- **Input / processing / output / security boundary.** Input: a workflow
+  id and the proposal's fields. Processing: pure string formatting and
+  regex validation — no I/O at all. Output: `github_plan.py`,
+  `tests/test_github_plan.py`, and the two doc updates. Security
+  boundary: no network, no `gh` call, no git action, no repository
+  touched, no secret, no commit.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` now
+  runs for the first time — `13 passed`. Full suite `248 passed`
+  (`235 + 13`); the release gate still ends
+  `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** Deciding "what does an AgentGuard-proposed
+  change look like" — the branch name and the PR body — before the plan
+  generator exists means Day 7's code has a fixed, tested contract to
+  produce, and a reviewer knows exactly what to expect from every
+  proposal.
+- **What this lab did not do.** No `create_plan` / `execute_plan`, no
+  repository/branch/path allowlist enforcement, no dry-run command list,
+  no `gh` call, no PR, no `.agentguard/pr_body.md` file, no
+  `.github/pull_request_template.md`, no change to the demo repo. No edit
+  to `.gitignore` / `CLAUDE.md` / `README.md` / `START_HERE.md` /
+  `VERSION.txt` / `docs/roadmap.md`. No git commit, tag, or push.
+
+## Day 2, Lab 7 — Practice a manual draft pull request and close it
+
+- **The idea.** Before automating a workflow, run it once by hand so
+  every command the automation later emits is one you have already
+  watched work. The full human remediation sequence, done in the demo
+  repo this lab:
+  1. `git checkout -b agentguard/manual-practice` — a branch matching the
+     Lab 6 rule.
+  2. Edit `connected_environment/agents.json` — set `Customer Support
+     Agent`'s `human_approval_required` to `true` (what the
+     `REQUIRE_HUMAN_APPROVAL` template will do).
+  3. `git add` / `git commit -m "AgentGuard remediation manual-practice"`
+     / `git push -u origin agentguard/manual-practice`.
+  4. `gh pr create --draft --title … --body-file …` — opened **PR #1**.
+  5. `gh pr view --json` — confirmed `isDraft: true`, base `main`, head
+     `agentguard/manual-practice`. Even though `mergeable` was
+     `MERGEABLE` (no conflicts), a draft **cannot be merged** — GitHub
+     hides the merge button until someone clicks "Ready for review".
+  6. `gh pr close 1 --delete-branch` — `state: CLOSED`, `mergedAt:
+     null`. The proposed change was discarded; the branch was deleted
+     locally and on GitHub; `git fetch --prune` confirmed only `main`
+     remains.
+  7. `git checkout main` — the working copy is back to the before-state;
+     demo `main` is still `e147248`, exactly as it was.
+- **What each manual step becomes in code.**
+  - `git checkout -b agentguard/<id>` ↔ `github_plan.branch_name()`
+    (Lab 6) + Day 7 Lab 3 ("Build safe branch and commit commands").
+  - `gh pr create --draft --body-file …` ↔ Day 7 Lab 4 ("Build the draft
+    pull request command"), using `github_plan.PR_BODY_TEMPLATE`.
+  - `gh pr close --delete-branch` ↔ Day 8 Lab 2 ("Create the pre-merge
+    rollback command plan", `rollback.py`).
+  The branch name I typed (`agentguard/manual-practice`) and the PR body
+  I used were both produced by the Lab 6 helpers — proof that the
+  metadata code generates something a human can actually run.
+- **"Closed" vs. "merged".** A *merged* PR applied its commit to the base
+  branch. A *closed* PR abandoned it — `main` never received the commit.
+  Closing a draft and deleting its branch is exactly the **pre-merge
+  rollback** path v4 will automate: cheap, complete, leaves no trace on
+  `main`.
+- **New terms:**
+  - **Draft PR badge / "Ready for review"** — the visual marker that a PR
+    is a draft, and the button that promotes it to a normal,
+    mergeable PR.
+  - **`gh pr create` / `gh pr view` / `gh pr close`** — the CLI verbs for
+    opening, inspecting, and abandoning a pull request.
+  - **`--delete-branch`** — on `gh pr close`/`merge`, also removes the
+    head branch (local and remote).
+  - **Merged vs. closed PR** — change applied vs. change abandoned.
+  - **Head branch vs. base branch** — the branch carrying the change
+    (`agentguard/manual-practice`) vs. the branch it targets (`main`).
+- **Input / processing / output / security boundary.** Input: a one-line
+  edit to the demo repo's `connected_environment/agents.json`.
+  Processing: manual `git` + `gh` commands, all in the demo repo. Output:
+  PR #1 (now `CLOSED`, unmerged), its branch deleted, demo repo `main`
+  unchanged, plus the two doc updates in this repo. Security boundary:
+  every action was in the private synthetic demo repo — **no merge**, no
+  production, no secret, and nothing committed in the AgentGuard repo.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `13 passed`, unchanged — this lab changed no code. Full suite still
+  `248 passed`; release gate still `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** The Day 7–8 code will generate branch, commit,
+  push, `gh pr create --draft`, and `gh pr close` commands. Running that
+  exact sequence by hand first means those generated commands are
+  reviewed against a known-good manual run, and the "draft-only, never
+  merge" property is something observed, not just asserted.
+- **What this lab did not do.** Merged nothing. Changed no code — not
+  `github_plan.py`, not its tests. No `create_plan()`, no `rollback.py`
+  (Day 7 / Day 8). No `.github/pull_request_template.md` in the demo
+  repo. No git commit or push in the AgentGuard repo. No edit to
+  `.gitignore` / `CLAUDE.md` / `README.md` / `START_HERE.md` /
+  `VERSION.txt` / `docs/roadmap.md`.
+
+## Day 2, Lab 8 — Record repository allowlist values without secrets
+
+- **The idea: identification vs. authentication.** The three allowlist
+  values — `justintinlei/agentguard-remediation-demo`,
+  `connected_environment/agents.json`, and the `agentguard/` branch
+  prefix — say *where* a remediation may go. None of them prove *who* you
+  are; reading them grants nobody any access. So they are **configuration**
+  and belong in version control (recorded in
+  `docs/v4_github_demo_setup.md`). The GitHub token proves who you are —
+  it is a **secret**, held in the macOS keyring, and never touches the
+  repo.
+- **The recorded allowlist.** Consolidated into one table in the demo
+  setup doc. `github_plan.py` (Day 7 Lab 1) will hard-code these three
+  values so any other repo, path, or branch name is refused before a
+  single `gh` command runs.
+- **The scanner change.** `scripts/check_no_secrets.py` scanned for
+  Anthropic keys and GitHub fine-grained PATs, but not the GitHub OAuth
+  token this course started using on Day 2 Lab 3. Added a third pattern,
+  `gh[oprsu]_[A-Za-z0-9]{36,}`, which matches the `gho_` (OAuth), `ghp_`
+  (classic PAT), `ghs_`, `ghr_`, and `ghu_` token families. Also
+  refactored the script into a `PATTERNS` tuple, a `scan()` function, and
+  a guarded `main()` so it can be imported and tested; `run_release_gate.py`
+  still calls it exactly the same way and it still prints
+  `SECRET CHECK PASS`.
+- **Why a precise regex, not a bare substring.** The reference
+  `check_no_secrets.py` uses `'ghp_' in text`. That would flag *this
+  entry* — it names `ghp_` and `gho_` — as a leaked secret. Requiring the
+  full 36+-character body after the prefix means documentation that
+  discusses token formats never trips the scan, only an actual token
+  does. That is the difference between a useful check and one everyone
+  learns to ignore.
+- **New test (`tests/test_check_no_secrets.py`, 6 cases).** `scan(ROOT)`
+  returns `[]` on the repo as it stands; the pattern set catches a
+  runtime-assembled Anthropic key, a fine-grained PAT, and all five `gh…`
+  token prefixes; a masked value (`gho_****…`) and a sentence naming the
+  prefixes do **not** match; a bare prefix with no body does not match.
+- **New terms:**
+  - **Configuration** — values that parameterise behaviour and carry no
+    access on their own; safe to commit.
+  - **Secret** — a value that authenticates; must never be committed.
+  - **Identification vs. authentication** — naming a thing vs. proving an
+    identity.
+  - **Allowlist as configuration** — the permitted set stored as plain
+    data, reviewed and version-controlled.
+  - **Secret scanning** — an automated search of the codebase for
+    credential-shaped strings.
+  - **Token prefix** — the fixed start of a credential type (`sk-ant-`,
+    `github_pat_`, `gho_`, `ghp_`).
+  - **False positive** — a scan match on text that is not actually a
+    secret; the reason the patterns are precise.
+  - **Credential store / keyring** — the OS's encrypted store for
+    secrets; where `gh` keeps its token.
+- **Input / processing / output / security boundary.** Input: the three
+  already-known allowlist values and the scanner's pattern list.
+  Processing: record the values as config prose, add one regex, add a
+  test. Output: `scripts/check_no_secrets.py`,
+  `tests/test_check_no_secrets.py`, and the two doc updates. Security
+  boundary: no token read or written, no `gh` call, no network, no
+  commit. The whole point of the lab is that no secret is recorded — the
+  scanner now proves it on every gate run.
+- **Verification.** `python scripts/check_no_secrets.py` →
+  `SECRET CHECK PASS` (exit 0). `python -m pytest -q
+  tests/test_check_no_secrets.py` → `6 passed`. Full suite `254 passed`
+  (`248 + 6`); release gate `RELEASE GATE PASS for AgentGuard v4`.
+- **What was inspected but not changed.** `.gitignore` already excludes
+  `.env` and `.env.*`; `CLAUDE.md` already says "Do not request or create
+  API keys." Neither needed a change.
+- **Why this lab exists.** An allowlist is only a control if it is
+  written down somewhere reviewable and if the thing that must *not* be
+  written down is actively checked for. This lab does both: the three
+  target values become committed configuration, and the secret scan grows
+  to cover the credential the project now uses.
+- **What this lab did not do.** No allowlist enforcement in code
+  (`github_plan.py`, Day 7). No `gh` call, no PR, no demo-repo change. No
+  edit to `.gitignore` / `CLAUDE.md` / `github_plan.py` / `README.md` /
+  `START_HERE.md` / `VERSION.txt` / `docs/roadmap.md`. No git commit,
+  tag, or push. No token value recorded anywhere.
+
+## Day 2 Summary — Labs 1 through 8
+
+A one-line takeaway per lab. (Written at Day 3 Lab 8 to match the
+per-day-summary convention v2 and v3 used; Day 2's was missed at the
+time.)
+
+1. **Understand GitHub repository, branch, commit, push, pull request** —
+   a pull request is a change *offered* for review; a merge is the change
+   *applied*; v4's remediation reuses that gap so a human always sits
+   between the two. Created `docs/v4_github_demo_setup.md`.
+2. **Install and verify the GitHub CLI** — `gh` 2.98.0 via Homebrew; one
+   auditable program for every GitHub action, version-checked only, no
+   auth yet.
+3. **Authenticate the GitHub CLI through the browser** — `gh auth login`
+   OAuth as `justintinlei`; the token lives in the macOS keyring, never
+   in a file. Created a minimal `app_v4.py` whose GitHub-auth panel
+   proves the app can see the auth state without holding the token.
+4. **Create a separate private remediation demo repository** —
+   `justintinlei/agentguard-remediation-demo` (private, empty). Never the
+   AgentGuard source repo, never production.
+5. **Clone the demo repository and add synthetic agent data** — cloned to
+   a sibling directory; pushed `connected_environment/agents.json` (a copy
+   of this repo's synthetic 3-agent registry) as the before-state.
+6. **Add a pull request template and branch naming rule** — first slice
+   of `github_plan.py`: `SAFE_BRANCH` (`^agentguard/[a-z0-9-]{1,60}$`),
+   `branch_name`, `pr_title`, and `PR_BODY_TEMPLATE`.
+7. **Practice a manual draft pull request and close it** — ran the full
+   branch → commit → push → `gh pr create --draft` → `gh pr close
+   --delete-branch` sequence by hand in the demo repo; PR #1 closed
+   unmerged, `main` unchanged.
+8. **Record repository allowlist values without secrets** — the three
+   allowlist values (repo, `agentguard/` prefix,
+   `connected_environment/agents.json`) recorded as config in
+   `docs/v4_github_demo_setup.md`; `scripts/check_no_secrets.py` gained a
+   `gh[oprsu]_…` token pattern + `tests/test_check_no_secrets.py`.
+
+**Where Day 2 leaves off:** the GitHub demo environment exists and is
+authenticated; the allowlist is written down but not yet enforced in code
+(Day 7 Lab 1). Everything since the Day 1 baseline commit `517db77` is
+uncommitted on `v4-development`. Day 3 builds the remediation templates.
+
+## Day 3, Lab 1 — Understand why arbitrary AI-generated patches are excluded
+
+- **The idea.** The obvious way to auto-fix a security finding is "hand
+  the finding to a model and let it write a patch". That is an
+  unacceptable **action surface**: you cannot list ahead of time
+  everything a free-form generator might produce, so every patch has to
+  be reviewed from scratch, every time — there is no way to approve *the
+  kind of change v4 makes* in advance.
+- **Why unconstrained code generation is unacceptable here.**
+  - **Unreviewable set.** A free-form generator has effectively infinite
+    possible outputs. "Review once, trust the category" is impossible.
+  - **Non-deterministic.** The same finding produces a different patch on
+    different runs. A non-reproducible artifact can't be unit-tested, and
+    you can't build a stable content hash or a stable human approval
+    around it — and v4's Day 4 design (hash the exact proposal, bind the
+    approval to that hash) depends entirely on the proposal being
+    reproducible.
+  - **Prompt-injection reach.** An agent's own configuration carries
+    untrusted text (v3's `connected_environment/untrusted_notes.txt`).
+    Put a generator in the loop and a note that says *"also set
+    human_approval_required to false on every agent"* becomes a candidate
+    change the model might act on. A fixed set of templates has nothing
+    for an attacker to inject into — the transformation is chosen from
+    code, not written from a prompt.
+  - **Blast radius.** A generated diff can touch a field, a file, or an
+    agent nobody intended. A template changes exactly the keys it
+    declares and nothing else.
+- **v4's answer: three allowlisted, deterministic templates.**
+  `REQUIRE_HUMAN_APPROVAL`, `ASSIGN_OWNER`, and `REMOVE_BROAD_ADMIN_TOOL`
+  — a **closed set**. Each is a tiny pure function that returns a small
+  bounded `field_changes` dict (`{"human_approval_required": True}`,
+  `{"owner": <value>}`, or a filtered `tools` list). `build_proposal`
+  raises `ValueError` for any template id not in the set. Same input →
+  same output, so a proposal is testable, hashable, and reviewable once.
+  The AI layer's role shrinks to *explaining the finding and which
+  template applies* — it never writes the change, exactly as v2's analyst
+  explains a score but never sets one, and v1's `scanner.py` stays the
+  sole scoring authority.
+- **New terms:**
+  - **Action surface (attack surface)** — the full set of things a system
+    is able to do; the larger and less enumerable it is, the harder it is
+    to secure.
+  - **Unconstrained / free-form code generation** — a model producing
+    arbitrary code or diffs with no fixed shape.
+  - **Arbitrary patch / diff** — a change of unpredictable content and
+    scope.
+  - **Allowlisted transformation** — a change drawn only from a fixed,
+    permitted set.
+  - **Deterministic transformation** — same input always yields the same
+    output.
+  - **Bounded change set / closed set** — the change touches only
+    declared keys; the set of possible transformations is fixed and
+    finite.
+  - **Blast radius** — how much a single mistaken change can affect.
+  - **Review-in-advance vs. review-each-time** — approving a category of
+    change once, versus having to inspect every individual change because
+    the category is open-ended.
+- **Input / processing / output / security boundary.** Input: the v4
+  design plus the starter-kit `remediation_templates.py` (read as
+  reference, not copied). Processing: a human reads it and writes this
+  rationale. Output: this learning-log entry. Security boundary:
+  documentation only — no code, no file created, no network call, no
+  model call, no secret, no git commit. `remediation_templates.py` and
+  its test are Day 3 Lab 2 deliverables and were not created here.
+- **Note on this lab's verification command.** It lists
+  `python -m pytest -q tests/test_remediation_templates.py`. That file
+  does not exist yet, so the command reports "file or directory not
+  found". Correct for this point in the course; no behaviour changed in
+  this lab. The full suite still reports `254 passed` and the release
+  gate still ends `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** Stating the exclusion first means every Day 3
+  build lab is adding one bounded, named transformation to a closed set —
+  never widening what the system is able to generate. It is easier to
+  keep an action surface small than to shrink one later.
+- **What this lab did not do.** Created no `remediation_templates.py` or
+  `tests/test_remediation_templates.py` (Day 3 Lab 2). Wrote no product
+  code. No edit to `README.md` / `START_HERE.md` / `VERSION.txt` /
+  `CLAUDE.md` / `docs/roadmap.md`. No git commit, tag, or push.
+
+## Day 3, Lab 2 — Define the three allowlisted remediation templates
+
+- **The idea.** v4 fixes a finding with one of exactly three fixed
+  transformations, each pointed at a specific v1 scanner rule:
+  | template | changes | clears |
+  |---|---|---|
+  | `REQUIRE_HUMAN_APPROVAL` | `human_approval_required` → `true` | AG-002 (destructive tool, no approval), AG-003 (sensitive data, no approval), AG-004 (outbound comms, no approval) |
+  | `ASSIGN_OWNER` | `owner` → a supplied person/team | AG-005 (no owner) |
+  | `REMOVE_BROAD_ADMIN_TOOL` | drop every `*` / `admin_*` tool | AG-001 (wildcard/admin access) |
+  Between them they cover every HIGH v1 finding plus the LOW ownership
+  one. AG-004 (MEDIUM) is also covered, as a side effect of the approval
+  template.
+- **Why exactly these three.** Each is a change that clears a v1 rule
+  and is *deterministic* (same agent in → same change out), *bounded*
+  (touches only its declared keys), and *reversible* (restore the old
+  value). Anything bigger — rewrite the agent, delete it, add a tool — is
+  out of scope for the MVP and would reopen the free-form action surface
+  Day 3 Lab 1 ruled out.
+- **What was created.** `remediation_templates.py` — the Lab 2 slice:
+  - `TemplateInfo` (frozen dataclass): `template_id`, `rationale`,
+    `addresses` (the v1 rule ids it clears), `needs_input` (a value the
+    user must supply, or `None`).
+  - `TEMPLATE_INFO` — the three records above.
+  - `ALLOWED_TEMPLATES = frozenset(TEMPLATE_INFO)` — the closed set; the
+    membership check every later step uses.
+  - `require_allowlisted(template_id)` — returns the `TemplateInfo`, or
+    raises `ValueError` (listing the allowed ids). This is the **single
+    gate**: an id that is not one of the three never reaches any
+    transformation code.
+  `tests/test_remediation_templates.py` (11 cases): exactly three ids;
+  each rationale is a real sentence and each `addresses` names only real
+  v1 rules; the union covers AG-001/002/003/005; only `ASSIGN_OWNER` has
+  `needs_input`; the gate returns the right info for the three and raises
+  for `RUN_SHELL`, `DROP_TABLE`, `""`, a lowercase id, a trailing-space
+  id, and `None`.
+- **What "define" means here vs. the later labs.** This lab fixes the
+  *names*, the *rationale*, the *finding each targets*, and the *"only
+  these three" rule*. Day 3 Lab 4 implements the `REQUIRE_HUMAN_APPROVAL`
+  field change; Lab 5 implements `ASSIGN_OWNER` with validation of the
+  user's value; Lab 6 implements the `REMOVE_BROAD_ADMIN_TOOL` filter;
+  Lab 3 wraps a template into a `RemediationProposal`; Lab 7 applies a
+  proposal to a deep copy only.
+- **Divergence from the starter kit (explained, not copied).** The final
+  `remediation_templates.py` keeps `ALLOWED_TEMPLATES` as a bare set and
+  folds each rationale into `build_proposal`. This build keeps the same
+  three ids and the same set semantics but stores the rationale and
+  rule-mapping as `TemplateInfo` metadata — easier to extend one lab at a
+  time, and it makes the finding-to-fix mapping testable now.
+- **New terms:**
+  - **Remediation template** — a fixed, named transformation from a
+    finding to a small config change.
+  - **Allowlist gate** — the one function that admits only the permitted
+    template ids.
+  - **`needs_input`** — a value the user must supply for a template to
+    run (here: the owner name for `ASSIGN_OWNER`).
+  - **Finding-to-fix mapping** — each template records exactly which v1
+    rule(s) it clears.
+  - **Closed set** — exactly three; not extendable at runtime.
+  - **Reversible change** — one that can be undone by restoring the prior
+    value.
+- **Input / processing / output / security boundary.** Input: v1's rule
+  definitions (`scanner.py`) and the v4 design. Processing: declare three
+  `TemplateInfo` records and one validation function — all pure. Output:
+  `remediation_templates.py`, `tests/test_remediation_templates.py`, and
+  this entry. Security boundary: no agent read or written, no environment
+  mutated, no network, no model call, no secret, no git commit.
+- **Verification.** `python -m pytest -q tests/test_remediation_templates.py`
+  → `11 passed` (first run). Full suite `265 passed` (`254 + 11`); the
+  release gate still ends `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** Naming the three transformations and the rule
+  each fixes — before any of them is implemented — means Labs 4-6 each
+  add one bounded, already-agreed behaviour, and the "exactly three" gate
+  is in place from the start.
+- **What this lab did not do.** No transformation logic (Labs 4-6), no
+  `RemediationProposal` dataclass (Lab 3), no
+  `apply_proposal_to_environment` (Lab 7). No edit to `scanner.py` or any
+  other existing file. No git commit, tag, or push.
+
+## Day 3, Lab 3 — Create the RemediationProposal data contract
+
+- **The idea.** A *proposal* is the reviewable unit of v4's workflow: one
+  frozen record with the five fields a human needs to judge a change.
+  `RemediationProposal` (added to `remediation_templates.py`) is that
+  record.
+  | field | role | example |
+  |---|---|---|
+  | `template_id` | **intent** — which allowlisted template | `"REQUIRE_HUMAN_APPROVAL"` |
+  | `agent_name` | **target** — exactly one agent, by name | `"Customer Support Agent"` |
+  | `field_changes` | **changes** — `{field: new_value}`, and nothing else | `{"human_approval_required": True}` |
+  | `rationale` | **rationale** — one plain sentence: why | `"Require a human checkpoint before this agent acts."` |
+  | `source_sha256` | **source hash** — the exact environment it was built against | (64 hex chars; the real value is computed Day 4) |
+- **Why `source_sha256` matters.** It binds the proposal to a *specific
+  starting state*. A proposal built against environment X carries X's
+  hash; if the environment later changes to Y, the stored hash no longer
+  matches, and Day 4's approval check refuses to apply a proposal whose
+  source has moved underneath it. Without this field, "approve now, apply
+  later" would be a blind trust that nothing changed in between.
+- **Why frozen.** `@dataclass(frozen=True)` — once a proposal is built its
+  fields can't be reassigned. A different change is a different object (and
+  a different hash), so the content a reviewer approved can never shift
+  after the fact.
+- **Why the contract validates itself.** `__post_init__` raises
+  `ValueError` if the `template_id` isn't allowlisted, the `agent_name` is
+  empty, the `field_changes` isn't a non-empty dict, the `rationale` is
+  empty, or the `source_sha256` is empty. A malformed proposal can never
+  be constructed, so it can never reach approval or apply. The core check
+  reuses `require_allowlisted()` from Lab 2 — the same single gate.
+- **`to_dict()`.** Returns the five fields as a plain dict, for the three
+  things that consume a proposal: the hash function (Day 4), the UI
+  display (Day 9), and the audit log (Day 5).
+- **Divergence from the starter kit (explained).** The final
+  `RemediationProposal` has no in-class validation — its `build_proposal`
+  validates first, and its test even passes the literal `"hash"` as
+  `source_sha256`. This build adds `__post_init__` checks because a "data
+  contract" should enforce its own shape, but keeps them compatible:
+  `source_sha256` only has to be a non-empty string, not 64-hex, so Day 4
+  is free to define the exact hash format.
+- **New terms:**
+  - **Data contract** — a record whose shape and invariants are fixed and
+    enforced, so every consumer can rely on them.
+  - **Frozen / immutable dataclass** — fields cannot be reassigned after
+    construction (`FrozenInstanceError` if you try).
+  - **`__post_init__`** — a dataclass hook that runs immediately after the
+    fields are set; used here purely to validate.
+  - **Serialisation / `to_dict()`** — turning an object into a plain dict
+    for hashing, display, or logging.
+  - **Source hash / provenance binding** — a hash stored on a record that
+    ties it to the exact input it was derived from.
+  - **Target scope** — a proposal changes exactly one agent, never a set.
+- **Input / processing / output / security boundary.** Input: the five
+  field values. Processing: construct a frozen record and validate it in
+  `__post_init__`. Output: the `RemediationProposal` dataclass, its tests,
+  and this entry. Security boundary: pure in-memory data — no agent read
+  or written, no environment mutated, no hashing performed yet, no
+  network, no secret, no git commit.
+- **Verification.** `python -m pytest -q tests/test_remediation_templates.py`
+  → `23 passed` (`11` from Lab 2 + `12` new). Full suite `277 passed`
+  (`265 + 12`); the release gate still ends
+  `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** Everything after this — hashing, approval,
+  verification, the GitHub plan, the audit log — operates on a
+  `RemediationProposal`. Fixing its five fields and its invariants now
+  means those later steps have one stable, validated thing to work with.
+- **What this lab did not do.** No `build_proposal` or template
+  transformation logic (Labs 4-6). No `proposal_hash.py` or real SHA-256
+  computation (Day 4). No `apply_proposal_to_environment` (Lab 7). No edit
+  to `scanner.py` or any other existing file. No git commit, tag, or push.
+
+## Day 3, Lab 4 — Implement require human approval
+
+- **Two approvals share the name, and this lab builds both.**
+  - The **template** `REQUIRE_HUMAN_APPROVAL` sets one field on the
+    *agent*: `human_approval_required = True`. That is a checkpoint on the
+    agent's own runtime actions.
+  - The **`ApprovalRecord`** is a human signing off on the *remediation
+    proposal* itself — a change-management checkpoint on the fix, not on
+    the agent.
+- **"One deterministic field change."** `build_proposal("REQUIRE_HUMAN_APPROVAL",
+  agent, source_hash)` returns a `RemediationProposal` whose
+  `field_changes` is exactly `{"human_approval_required": True}` — nothing
+  else. Same agent and source in → an equal proposal out, every time. That
+  single flip clears v1 findings AG-002 (destructive tool, no approval),
+  AG-003 (sensitive data, no approval), and AG-004 (outbound comms, no
+  approval). Compare a free-form AI patch (Day 3 Lab 1): unbounded,
+  unpredictable, non-reproducible.
+- **The approval is bound to two hashes.** `decide(proposal_sha256,
+  source_sha256, reviewer, decision, reason)` records the human choice;
+  `validate_approval(record, proposal_sha256, source_sha256)` refuses to
+  let it proceed unless:
+  - the decision was `APPROVE` (a `REJECT` is not an approval), **and**
+  - the proposal hash still matches (else "the proposal changed"), **and**
+  - the source hash still matches (else "the source changed").
+  So an approval can never be reused for a proposal that was edited, or
+  against an environment that moved since it was reviewed.
+- **The hash is not canonical yet.** `proposal_hash.sha256_value` uses
+  plain `json.dumps`, which keeps dictionary insertion order — so
+  `{"a": 1, "b": 2}` and `{"b": 2, "a": 1}` currently hash differently.
+  Day 4 Lab 2 adds `canonical_json` (sorted keys, fixed separators) to fix
+  that; for this lab the proposals and environments are built the same way
+  each time, so it does not bite.
+- **Build seams.** `build_proposal` raises `NotImplementedError` for
+  `ASSIGN_OWNER` and `REMOVE_BROAD_ADMIN_TOOL` — Day 3 Lab 5 and Lab 6
+  fill those in. `ApprovalRecord` has five fields now; Day 4 Lab 5 adds
+  `workflow_id` and `decided_at` so the record becomes full audit
+  evidence.
+- **New terms:**
+  - **Human-in-the-loop / approval gate** — a required human decision
+    before an automated step is allowed to proceed.
+  - **Approval record** — the stored decision: which proposal, which
+    source, who, APPROVE/REJECT, and why.
+  - **Hash binding** — attaching a decision to the hash of exactly what
+    was reviewed, so the decision is void if that thing changes.
+  - **Stale approval / replay** — trying to reuse an old approval after
+    the proposal or environment it approved has changed;
+    `validate_approval` blocks it.
+  - **Deterministic field change** — a fixed, reproducible edit to one
+    field (here `human_approval_required`).
+  - **`NotImplementedError` as a build seam** — a deliberate, obvious
+    placeholder that the next lab replaces.
+- **Input / processing / output / security boundary.** Input: a template
+  id, an agent dict, and a source-hash string. Processing: build one
+  bounded proposal, hash it, record a human decision, validate the
+  binding — all pure and in memory. Output: `build_proposal` (in
+  `remediation_templates.py`), `proposal_hash.py`, `approval.py`, and
+  their tests. Security boundary: no agent or environment is mutated (the
+  proposal only *describes* the change); no network, no model call, no
+  secret, no git commit.
+- **Verification.** `python -m pytest -q tests/test_remediation_templates.py
+  tests/test_approval.py` → `40 passed`. Full suite `294 passed`
+  (`277 + 17`); the release gate still ends
+  `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** Human approval is the single control that
+  keeps a high-impact autonomous action from happening without a person
+  in the loop. Implementing it against the simplest template — one field,
+  one deterministic change — makes the whole propose → hash → approve →
+  validate chain concrete before the harder templates and the full
+  hashing arrive.
+- **What this lab did not do.** No `ASSIGN_OWNER` (Lab 5) or
+  `REMOVE_BROAD_ADMIN_TOOL` (Lab 6) transformation. No `canonical_json` /
+  sorted-key hashing (Day 4 Lab 2). No `ApprovalRecord` audit fields
+  `workflow_id` / `decided_at` (Day 4 Lab 5). No
+  `apply_proposal_to_environment` (Lab 7). No edit to `scanner.py` or any
+  other existing file. No git commit, tag, or push.
+
+## Day 3, Lab 5 — Implement assign owner with required input
+
+- **The idea.** `ASSIGN_OWNER` is the only template that needs a value a
+  *person* supplies — who owns this agent. A person-supplied value is
+  user-controlled, and therefore untrusted: `build_proposal` validates it
+  **before** it is placed in a `RemediationProposal`, so a malformed owner
+  can never become a proposal, get hashed, or get approved. Setting a real
+  `owner` clears v1 finding AG-005.
+- **`_validate_owner()` — four checks, and why each.**
+  | check | fails on | why it matters |
+  |---|---|---|
+  | `isinstance(value, str)` | `None`, `123`, `["Team"]` | a non-string is a client bug or an injection attempt; reject before it reaches the dict |
+  | non-empty after `.strip()` | `""`, `"   "` | an empty owner does not actually assign accountability, so AG-005 would still fire |
+  | `len(owner) <= 200` | `"x" * 201` | matches the `owner` field limit everywhere else (`docs/v3_data_contract.md`, `discovery_adapter.MAX_FIELD_CHARS`), so the proposal cannot be rejected downstream or bloat `agents.json` / a PR body |
+  | single line (no `\n` / `\r`) | `"Team A\nTeam B"` | the value ends up in a JSON file and a pull-request body; a newline could break formatting or smuggle extra content |
+  It returns the **stripped** owner, so whitespace is normalised once, at
+  the boundary.
+- **Why validate *before* proposal creation, not after.** A
+  `RemediationProposal` is frozen and is the unit that gets hashed and
+  approved. If a bad value could get in, there would be an "invalid but
+  approved" state. Rejecting at construction time means every proposal
+  that exists anywhere in the workflow is already well-formed.
+- **New terms:**
+  - **User-supplied / user-controlled input** — a value that comes from a
+    person, not from code; always treated as untrusted.
+  - **Input validation** — checking a value against explicit rules before
+    using it.
+  - **Trust boundary** — the exact point where untrusted input is checked
+    and, if it passes, becomes safe to use (here, `_validate_owner`).
+  - **Whitespace normalisation** — trimming leading/trailing spaces
+    (`.strip()`) so the same intent produces the same stored value.
+  - **Bounded input** — a value with an enforced maximum size.
+  - **Fail-fast** — reject a bad value immediately, at the door, rather
+    than deep in the pipeline.
+- **Input / processing / output / security boundary.** Input: a template
+  id, an agent dict, and the user's owner string. Processing: validate the
+  owner, then build one bounded proposal. Output: the `ASSIGN_OWNER`
+  branch of `build_proposal`, `_validate_owner`, `MAX_OWNER_CHARS`, the
+  tests, and this entry. Security boundary: pure and in memory — no agent
+  or environment mutated, no network, no model call, no secret, no git
+  commit.
+- **Verification.** `python -m pytest -q tests/test_remediation_templates.py`
+  → `40 passed` for that file; with `tests/test_approval.py` too,
+  `51 passed`. Full suite `305 passed` (`294 + 11`); the release gate
+  still ends `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** Two of the three templates change a fixed value
+  the system already knows; `ASSIGN_OWNER` is the one place a human types
+  something in. Putting the validation at the single point where that
+  input enters the workflow — rather than trusting the caller or checking
+  later — is what keeps every proposal, hash, and approval downstream
+  working on clean data.
+- **What this lab did not do.** No `REMOVE_BROAD_ADMIN_TOOL` (Day 3 Lab
+  6). A `value` passed to a template that does not need one
+  (`REQUIRE_HUMAN_APPROVAL`) is still silently ignored — not changed here.
+  No `apply_proposal_to_environment` (Lab 7). No `canonical_json`
+  (Day 4). No edit to `approval.py` / `scanner.py` / any other existing
+  file. No git commit, tag, or push.
+
+## Day 3, Lab 6 — Implement remove broad admin tool
+
+- **The idea.** A tool named `*` (wildcard - matches everything) or one
+  starting `admin_` lets an agent do almost anything, so a bug or a
+  compromised agent is catastrophic. v1 flags this as AG-001 (HIGH, 80
+  points). The fix is an **allowlisted transformation**: not "have a
+  model rewrite the tool list" (free-form, unpredictable) but one fixed
+  rule - drop every `*` and every `admin_*` entry, keep everything else,
+  in the same order.
+- **`_remove_broad_tools()`.**
+  `kept = [t for t in tools if t != "*" and not str(t).startswith("admin_")]`.
+  This is the exact **inverse of v1's AG-001 check** (same predicate,
+  negated), so applying the result is guaranteed to clear the finding -
+  and the test proves it against v1's real `scanner.evaluate_agent`:
+  AG-001 fires on the broad tools list, and does not fire on the filtered
+  one.
+- **Least privilege.** The transformation only ever *removes*. The agent
+  goes from "can do anything" to "can do exactly the specific tools it
+  already had" - it never gains a capability.
+- **Prefix-match precision.** `admin_` matches `admin_delete_user` but
+  not `administrator_x` (no underscore in the right place) or `readmin_x`
+  (`admin` not at the start). `*` must be the whole entry. The tests pin
+  all three.
+- **The two guards.**
+  - `tools` must be a `list` - a string or a number is a malformed agent
+    record, rejected before it reaches the filter.
+  - There must be something broad to remove: if the filter changes
+    nothing (`kept == tools`), it raises. A remediation that produces a
+    no-op proposal is a mistake, not a fix. (None of the synthetic agents
+    have `*` / `admin_` tools, so in practice this template only runs
+    against an agent that genuinely has one.)
+  - An empty result *is* allowed: an agent whose only tool was `"*"`
+    becomes `{"tools": []}` - the finding is cleared, and Day 6's
+    verifier will re-scan to confirm nothing else broke.
+- **New terms:**
+  - **Wildcard access (`*`)** - a single tool entry that grants
+    everything.
+  - **Administrator tool (`admin_*`)** - a tool named for a privileged
+    operation.
+  - **Allowlisted transformation** - a change produced by a fixed rule
+    from a closed set, never free-form generation.
+  - **Least privilege** - grant only the access actually needed; here,
+    only ever narrow it.
+  - **Order-preserving filter** - removes some list items, keeps the rest
+    in position.
+  - **No-op guard** - refuse to emit a change that changes nothing.
+  - **Prefix-match precision** - matching a literal prefix exactly, not
+    "contains" or "looks like".
+- **Input / processing / output / security boundary.** Input: a template
+  id, an agent dict, a source hash. Processing: filter the agent's
+  `tools` list by the fixed rule. Output: the `REMOVE_BROAD_ADMIN_TOOL`
+  branch of `build_proposal`, `_remove_broad_tools`, the tests, and this
+  entry. Security boundary: pure and in memory - the agent dict and its
+  `tools` list are read, never mutated; no network, no model call, no
+  secret, no git commit.
+- **Day 3 template arc complete.** All three templates now turn a finding
+  into a `RemediationProposal`: `REQUIRE_HUMAN_APPROVAL` and
+  `REMOVE_BROAD_ADMIN_TOOL` take no user input; `ASSIGN_OWNER` takes one
+  validated value. `build_proposal`'s final `else` is now an
+  `AssertionError` that `require_allowlisted` makes unreachable.
+- **Verification.** `python -m pytest -q tests/test_remediation_templates.py`
+  → `48 passed`. Full suite `313 passed` (`305 + 8`); the release gate
+  still ends `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** Over-broad tool access is the single
+  highest-scoring v1 finding. Fixing it with a fixed, order-preserving,
+  removal-only filter - rather than a generated patch - means the fix is
+  reviewable once, reproducible, and provably clears the exact rule it
+  targets.
+- **What this lab did not do.** No `apply_proposal_to_environment` (Day 3
+  Lab 7) - nothing yet applies a proposal to a copy of the environment.
+  No `canonical_json` / real hashing (Day 4). No edit to `approval.py` /
+  `scanner.py` / any other existing file. No git commit, tag, or push.
+
+## Day 3, Lab 7 — Apply proposals to deep copies only
+
+- **The idea.** To show a diff, or to re-scan and verify a change (Day 6),
+  v4 has to see the environment's "after" state. But the real (synthetic)
+  source must not move. `apply_proposal_to_environment(environment,
+  proposal)` returns a **new** environment with the proposal applied and
+  leaves the input byte-for-byte unchanged.
+- **How it works.**
+  1. `copy.deepcopy(environment)` - a fully independent copy. Every
+     nested list and dict is duplicated, so mutating the copy can never
+     reach the original.
+  2. find the one agent whose `agent_name` matches the proposal.
+  3. `matches[0].update(proposal.field_changes)` on the copy, then
+     return the copy.
+- **Deep copy vs. shallow copy.** A shallow copy (`dict(env)`,
+  `env.copy()`) duplicates only the top-level dict; the `agents` list and
+  each agent dict inside it are still the *same objects* as in the
+  original (aliasing). `agent.update(...)` on a shallow copy would edit
+  the source. `copy.deepcopy` duplicates every level, so the copy and the
+  source share nothing. The test proves it three ways: `env` is
+  deep-equal to a pre-call snapshot, `updated is not env`, and
+  `updated["agents"][0] is not env["agents"][0]`.
+- **Exactly one target.** The proposal names one agent; applying it
+  requires finding exactly one match. Zero means this is the wrong
+  environment or the agent was renamed since the proposal was built; more
+  than one is ambiguous. Both raise `ValueError` - the change is never
+  applied to a guess.
+- **Why this is a security boundary.** Every downstream step that needs
+  the "after" state works on a throwaway copy. A bug in a template, a
+  rejected proposal, or a failed verification can never leave the source
+  environment in a half-changed state, because the source was never
+  written to.
+- **New terms:**
+  - **Deep copy** - a copy where every nested object is also copied.
+  - **Shallow copy** - a copy where the top level is new but nested
+    objects are shared with the original.
+  - **Aliasing** - two names (or two containers) referring to the same
+    object, so a change through one is visible through the other.
+  - **In-place mutation** - changing an object rather than producing a
+    new one (`dict.update`, `list.append`).
+  - **`copy.deepcopy`** - the stdlib function that makes a deep copy.
+  - **Planning / dry-run phase** - working out and checking the effect of
+    a change without committing it anywhere.
+  - **Single-target constraint** - a proposal affects exactly one agent.
+  - **Source immutability** - the original data is never modified.
+- **Input / processing / output / security boundary.** Input: an
+  environment dict and a `RemediationProposal`. Processing: deep-copy the
+  environment, locate exactly one agent, `dict.update` the bounded change
+  on the copy. Output: a new environment dict. Security boundary: pure
+  and in memory - the input dict is never mutated, nothing is written to
+  disk, no network, no model call, no secret, no git commit.
+- **Verification.** `python -m pytest -q tests/test_remediation_templates.py`
+  → `53 passed`. Full suite `318 passed` (`313 + 5`); the release gate
+  still ends `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** "The source is never changed during planning"
+  is a guarantee, and `copy.deepcopy` at the top of
+  `apply_proposal_to_environment` is where it is made. Day 6's verifier
+  re-scans the *returned copy*; the real environment stays a fixed
+  reference point the whole time.
+- **What this lab did not do.** No re-scan or verifier that consumes the
+  returned copy (Day 6). No `canonical_json` / real proposal hashing
+  (Day 4). No file written to disk. No edit to `scanner.py` / `approval.py`
+  / any other existing file. No git commit, tag, or push.
+
+## Day 3, Lab 8 — Write template and immutability tests
+
+- **The idea.** Day 3's security claim is: *the remediation engine can do
+  exactly three named things, and each one changes exactly one named
+  field.* A claim like that is only worth something if an automated test
+  **fails the moment it stops being true**. This lab writes that test set
+  - the one an auditor points to - and closes the two small gaps that
+  would have let the claim be broken without anyone noticing.
+- **The invariant tests (and what each guards).**
+  - *Only its one field* - for each of the three templates,
+    `set(build_proposal(...).field_changes)` is exactly `{that template's
+    one key}` (`human_approval_required` / `owner` / `tools`). If a
+    template ever started writing a second field, this fails.
+  - *Never an identity field* - `field_changes` keys are always disjoint
+    from `{agent_name, identity, sensitive_data_access}`. A remediation
+    can never rename an agent, change its identity, or flip its
+    data-access flag.
+  - *Apply is surgical* - after `apply_proposal_to_environment`, the only
+    keys whose value changed on the target agent are the proposal's keys;
+    no key is added or removed; every other agent is byte-identical.
+  - *Only three templates* - `ALLOWED_TEMPLATES` is a `frozenset`
+    (`.add()` raises); `TEMPLATE_INFO` is read-only (`TEMPLATE_INFO["X"] =
+    …` raises `TypeError`), so a fourth template can't be slipped in by
+    mutating the module; `require_allowlisted` / `build_proposal` still
+    refuse unknown, lowercase, empty, and `None` ids.
+  - *Frozen records* - `TemplateInfo` and `RemediationProposal` reject
+    attribute reassignment; and mutating the dict you passed to
+    `build_proposal` afterward does not change the proposal.
+- **The two hardenings.**
+  - `TEMPLATE_INFO = MappingProxyType(_TEMPLATE_INFO)` - a read-only view
+    of the registry dict. Before this, `TEMPLATE_INFO["EVIL"] = …` would
+    have silently added a fourth allowlisted template.
+  - `RemediationProposal.__post_init__` now does
+    `object.__setattr__(self, "field_changes", dict(self.field_changes))`
+    - a **defensive copy**. Before this, the proposal held the caller's
+    dict by reference, so mutating that dict later would change the
+    proposal (an aliasing bug).
+- **Immutability at rest vs. immutability of contents.** The proposal is
+  frozen (you can't rebind `.field_changes`) and now owns a copy of the
+  dict - but the dict's *contents* are still technically mutable
+  (`proposal.field_changes["x"] = 1` works). Deep-freezing would break
+  JSON hashing (`json.dumps` can't serialise a `mappingproxy`), so the
+  real guarantee is narrower and enforced upstream: `build_proposal` only
+  ever puts approved keys in there, and no external dict is aliased in.
+- **New terms:**
+  - **Invariant** - a property that must hold at every point in the
+    program's life.
+  - **Regression test as a guardrail** - a test whose only job is to fail
+    if a guarantee is broken by a later change.
+  - **`MappingProxyType`** - a read-only wrapper around a dict; reads work,
+    writes raise.
+  - **Defensive copy** - copying an input so the caller cannot mutate your
+    internal state through the reference they still hold.
+  - **Aliasing** - two names (or containers) pointing at the same object.
+  - **Negative test** - asserting that a bad input is *rejected*, not that
+    a good one is accepted.
+- **Input / processing / output / security boundary.** Input: the
+  three-template engine as built over Labs 2-7. Processing: assert its
+  invariants; harden the registry and the proposal. Output: the invariant
+  test section, the two one-line hardenings, and this entry. Security
+  boundary: pure and in memory - no agent or environment mutated, no
+  network, no model call, no secret, no git commit.
+- **Day 3 arc complete.** Lab 1 ruled out free-form generated patches;
+  Labs 2-3 defined the closed set of three templates and the
+  `RemediationProposal` contract; Labs 4-6 implemented the three
+  deterministic transformations (approval, owner, broad-tool removal),
+  each tied to the exact v1 rule it clears; Lab 7 made planning operate on
+  a deep copy so the source is never touched; Lab 8 wrote the tests that
+  prove all of it and hardened the two spots that made the proof real.
+- **Verification.** `python -m pytest -q tests/test_remediation_templates.py`
+  → `69 passed` for that file; with `tests/test_approval.py`, `80 passed`.
+  Full suite `334 passed` (`318 + 16`); the release gate still ends
+  `RELEASE GATE PASS for AgentGuard v4`.
+- **Why this lab exists.** The value of a bounded action surface is that
+  you can *keep* it bounded. These tests are what makes a future change
+  that widens it - a template that touches two fields, a fourth template,
+  an aliased dict - fail loudly instead of shipping.
+- **What this lab did not do.** No `verifier.py` (Day 6) - nothing yet
+  re-scans an applied proposal. No `canonical_json` / real hashing
+  (Day 4). No edit to `scanner.py` / `approval.py` / any other existing
+  file. No git commit, tag, or push.
+
+## Day 3 Summary — Labs 1 through 8
+
+1. **Understand why arbitrary AI-generated patches are excluded** - a
+   free-form code generator is an unbounded, unreviewable, non-reproducible
+   action surface and a prompt-injection target; v4 excludes it.
+2. **Define the three allowlisted remediation templates** -
+   `REQUIRE_HUMAN_APPROVAL` (AG-002/003/004), `ASSIGN_OWNER` (AG-005),
+   `REMOVE_BROAD_ADMIN_TOOL` (AG-001), as a closed set with a
+   rationale and a rule-mapping each, plus the `require_allowlisted` gate.
+3. **Create the RemediationProposal data contract** - a frozen five-field
+   record (intent, target, changes, rationale, source hash) that
+   validates its own shape.
+4. **Implement require human approval** - `build_proposal` for the first
+   template (one deterministic field change), plus `proposal_hash.py`
+   (`sha256_value`) and `approval.py` (`ApprovalRecord`, `decide`,
+   `validate_approval`), the approval bound to proposal + source hashes.
+5. **Implement assign owner with required input** - the `ASSIGN_OWNER`
+   branch, validating the user-supplied owner (string, non-empty, ≤ 200
+   chars, single line) at the trust boundary before it enters a proposal.
+6. **Implement remove broad admin tool** - an order-preserving filter that
+   drops every `*` and `admin_*` tool, the exact inverse of AG-001, with a
+   list-type guard and a no-op guard; proven against v1's real scanner.
+7. **Apply proposals to deep copies only** -
+   `apply_proposal_to_environment` deep-copies the environment, applies the
+   change to exactly one agent in the copy, and returns it; the source is
+   never mutated.
+8. **Write template and immutability tests** - the invariant test set
+   (only three templates, only their one field, surgical apply, frozen
+   records) plus a read-only registry and a defensive `field_changes`
+   copy.
+
+**Where Day 3 leaves off:** the full remediation engine exists and is
+tested - `remediation_templates.py` (3 templates + proposal + apply),
+`approval.py`, `proposal_hash.py` - but nothing hashes a proposal
+canonically yet, records an audit trail, or verifies an applied change.
+Everything since the Day 1 baseline commit `517db77` is uncommitted on
+`v4-development`; the suite is at `334 passed`. Day 4 builds canonical
+JSON + SHA-256 and the full ApprovalRecord.
+
+## Day 4, Lab 1 — Understand canonical JSON and SHA-256
+
+- **The idea.** A v4 approval is only worth something if it is pinned to
+  the *exact* thing that was reviewed. The way we pin it is a
+  **fingerprint**: a short string computed from the content, such that the
+  same content always produces the same fingerprint and any change
+  produces a different one. Later, software re-computes the fingerprint
+  and only lets the work proceed if it still matches what the human
+  approved. For this to be trustworthy the fingerprint must be
+  **deterministic** - it cannot depend on the order Python happened to
+  build a dictionary in, on incidental spaces, or on the machine. This
+  lab is the concept groundwork: what SHA-256 gives us, why plain
+  `json.dumps` is *not* deterministic for this purpose, and what
+  "canonical JSON" fixes. No code changes this lab.
+- **How a fingerprint is made.** You cannot hash a dict directly - a hash
+  takes bytes. So there are two steps: (1) **serialise** the value to a
+  text string, (2) **hash** those bytes with SHA-256. Step 2 is already
+  rock-solid and standard. Step 1 is where the danger is: if the same
+  data can serialise to two different strings, it hashes to two different
+  fingerprints, and the whole "the hashes match ⇒ the content is
+  identical" guarantee collapses.
+- **The serialisation problem, concretely.** Python dictionaries remember
+  insertion order and `json.dumps` preserves it. `{"a": 1, "b": 2}` and
+  `{"b": 2, "a": 1}` are the *same data* but serialise to different text
+  (`{"a": 1, "b": 2}` vs `{"b": 2, "a": 1}`) and therefore get different
+  SHA-256 digests. Whitespace is a second source of drift: `dumps` puts a
+  space after every `:` and `,` by default, and that spacing is not part
+  of the data's meaning but *is* part of the bytes you hash.
+- **Canonical JSON = one fixed spelling per value.** Three rules remove
+  every incidental difference:
+  - `sort_keys=True` - object keys always in the same (sorted) order, so
+    build order stops mattering.
+  - `separators=(",", ":")` - no space after `:` or `,`, so incidental
+    formatting stops mattering.
+  - `ensure_ascii=True` - non-ASCII characters are written as fixed
+    `\uXXXX` escapes, so the text is the same regardless of the file or
+    terminal encoding.
+  With all three, equal data always produces byte-identical text, so
+  equal data always produces the same fingerprint.
+- **Why v4 needs this exact property.** `approval.py`'s
+  `validate_approval()` binds an approval to two fingerprints -
+  `proposal_sha256` and `source_sha256` - and refuses to proceed unless
+  *both* still match at apply time. Without canonicalisation this check
+  has two failure modes: (1) content that never changed re-serialises a
+  different way and the fingerprint no longer matches, so a valid
+  approval looks stale and safe work is blocked for no reason; (2) worse
+  in principle - two different contents could be made to serialise to the
+  same text, letting a changed proposal keep an old, still-"valid"
+  approval. Canonical JSON removes the ambiguity in both directions:
+  "the hashes match" comes to mean exactly "the content is identical".
+- **The honest current gap.** `proposal_hash.py` today has only
+  `sha256_value()`, and it calls `json.dumps(value, default=str)` with no
+  canonical options - so right now the fingerprint *is* sensitive to dict
+  order. Its own docstring already flags this. Day 4 Lab 2 adds
+  `canonical_json()` (the three rules above) and `tests/test_proposal_hash.py`;
+  this lab only records why that change is needed.
+- **New terms:**
+  - **Hash function** - turns any input into a fixed-size string (a
+    "digest"); the same input always gives the same digest.
+  - **SHA-256** - a specific standard hash function; its digest is 256
+    bits, written as 64 hexadecimal characters; in Python
+    `hashlib.sha256(b"...").hexdigest()`.
+  - **Digest / fingerprint** - the fixed-size output of a hash function,
+    used here as a stand-in identity for a piece of content.
+  - **Deterministic** - the same input always produces the same output;
+    no randomness, no dependence on time, order, or machine.
+  - **Avalanche effect** - changing one bit of the input flips roughly
+    half the output bits; there is no "close" digest.
+  - **One-way (preimage resistance)** - given a digest you cannot
+    feasibly recover the input; v4 relies on same-in-same-out, not on
+    secrecy.
+  - **Collision** - two different inputs with the same digest; for
+    SHA-256 none is known and finding one is considered infeasible.
+  - **Serialisation** - turning an in-memory value into a flat string or
+    bytes so it can be hashed, stored, or sent.
+  - **Canonical form** - one agreed single spelling for a given value, so
+    that equal values never serialise two different ways.
+  - **Canonical JSON** - JSON serialised with `sort_keys=True`,
+    `separators=(",", ":")`, and `ensure_ascii=True` so equal data is
+    always byte-identical text.
+- **Input / processing / output / security boundary.** Input: the
+  existing `proposal_hash.py` and `approval.py`, and the concept of
+  hash-bound approval from Day 3 Lab 4. Processing: understanding only -
+  no computation is added or changed. Output: this learning-log entry.
+  Security boundary: pure documentation - no code path changes, no agent
+  or environment touched, no network, no model call, no secret, no git
+  action. Deterministic authority is unchanged: `scanner.py` still owns
+  risk scores; a fingerprint only ever *checks whether reviewed content
+  is still identical* - it never decides, approves, verifies, or scores.
+- **Verification.** No behaviour changed, so there is nothing new to
+  assert this lab. `python -m pytest -q tests/test_proposal_hash.py
+  tests/test_approval.py` reports `file or directory not found:
+  tests/test_proposal_hash.py` - that file is built in Lab 2, so its
+  absence now is expected, not a failure. `python -m pytest -q
+  tests/test_approval.py` alone is still `11 passed`; the full suite is
+  still `334 passed`; `python scripts/run_release_gate.py` still ends
+  `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .` is
+  clean.
+- **Why this lab exists.** Every later Day 4 lab - hashing the source,
+  hashing the proposal, the ApprovalRecord, stale-approval rejection -
+  assumes that "same content ⇒ same fingerprint" is airtight. If it is
+  not, the audit trail lies: an approval could be replayed against
+  changed data, or valid work could be blocked as fake-stale. Getting the
+  canonicalisation rules straight first is what makes the rest of the
+  week's guarantees real.
+- **What this lab did not do.** No `canonical_json()`, no edit to
+  `proposal_hash.py` or `approval.py`, no `tests/test_proposal_hash.py`
+  (all Day 4 Lab 2). No `verifier.py`, no audit DB, no `workflow.py`. No
+  git commit, tag, or push.
+
+## Day 4, Lab 2 — Build canonical JSON and sha256_value helpers
+
+- **The idea.** Lab 1 established that an approval is only trustworthy if
+  "same content ⇒ same fingerprint" is airtight, and that
+  `proposal_hash.sha256_value()` did not yet meet that bar - it serialised
+  with plain `json.dumps`, which lets dict key order and incidental
+  whitespace change the bytes. This lab builds the fix: a `canonical_json()`
+  helper that gives every value exactly one spelling, and a rewritten
+  `sha256_value()` that hashes that canonical text. `{"a": 1, "b": 2}` and
+  `{"b": 2, "a": 1}` now produce the identical digest.
+- **The three canonical rules (and what each removes).**
+  - `sort_keys=True` - object keys are always written in sorted order, so
+    the order a dict was *built* in stops affecting the output. This is
+    the big one: Python dicts remember insertion order and `json.dumps`
+    preserves it.
+  - `separators=(",", ":")` - no space after `:` or `,`. The default
+    spacing is presentation, not data, but it is still part of the bytes
+    you hash; pinning it removes that drift.
+  - `ensure_ascii=True` - any non-ASCII character (e.g. `é`) is written as
+    a fixed `\uXXXX` escape, so the text does not depend on the file or
+    terminal encoding.
+  With all three pinned, equal data becomes byte-identical text, and
+  byte-identical text has an identical SHA-256 digest.
+- **Why `default=str` was removed.** The Day 3 slice passed
+  `json.dumps(value, default=str)` so that a stray non-JSON value (say a
+  `datetime`) would be stringified instead of raising. Canonical hashing
+  wants the opposite behaviour: only genuine JSON types (dict, list, str,
+  int, float, bool, None) should be hashable. If an unexpected object
+  slips in, raising `TypeError` is safer than silently hashing its
+  `str()` form - two different objects can share a string, which would
+  let changed content keep an old fingerprint. The reviewed starter-kit
+  `proposal_hash.py` also omits `default=str`; this lab matches it.
+- **What did not change.** `sha256_value()` still returns a 64-character
+  lowercase hex SHA-256 digest, and `approval.py` is untouched. Because
+  `tests/test_approval.py` only ever *compares* two `sha256_value()`
+  results (hash both sides, check equal / not-equal) rather than
+  asserting a specific literal digest, switching the serialiser to
+  canonical form left all 11 approval tests green.
+- **New terms:**
+  - **Canonical JSON** - JSON written with fixed rules (sorted keys, no
+    incidental whitespace, ASCII escapes) so that equal data always
+    serialises to byte-identical text.
+  - **`json.dumps` options used** - `sort_keys` orders object keys;
+    `separators` sets the item and key/value delimiters; `ensure_ascii`
+    escapes non-ASCII to `\uXXXX`.
+  - **Deterministic serialisation** - a serialiser whose output depends
+    only on the value, not on build order, formatting, or environment.
+  - **Silent coercion** - converting an unexpected input to a different
+    type without complaint (here, an arbitrary object to its string
+    form); removed on purpose so bad input fails loudly.
+- **Input / processing / output / security boundary.** Input: any value
+  made of JSON-native types (a source environment dict, a
+  `RemediationProposal.to_dict()`). Processing: `canonical_json()`
+  serialises it deterministically; `sha256_value()` UTF-8 encodes that
+  text and returns its SHA-256 hex digest. Output: a canonical JSON
+  string, and a 64-char fingerprint. Security boundary: pure, in-memory,
+  no network, no model call, no secret, no git action. Authority is
+  unchanged - `scanner.py` still owns risk scores; a fingerprint only
+  ever answers "is this the same content that was reviewed?" and never
+  decides, approves, verifies, or scores.
+- **Verification.** `python -m pytest -q tests/test_proposal_hash.py
+  tests/test_approval.py` → `21 passed` (10 new hash tests + the existing
+  11 approval tests). Full suite → `344 passed` (`334 + 10`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** Every remaining Day 4 lab - hashing the source
+  environment (Lab 3), hashing the whole proposal (Lab 4), rejecting a
+  stale approval (Lab 7) - is built on the assumption that the fingerprint
+  reacts to *content* and nothing else. If key order or whitespace could
+  move a digest, a valid approval could look stale (safe work blocked) or
+  a changed proposal could keep a passing approval (unsafe work allowed).
+  Canonicalisation is the small, boring step that makes those later
+  guarantees real.
+- **What this lab did not do.** No change to `approval.py` - the audit
+  fields `workflow_id` and `decided_at` are Day 4 Lab 5. No `verifier.py`,
+  no audit DB, no `workflow.py`. `sha256_value()` is not yet *called* on a
+  real source environment or a full proposal in product code - that
+  wiring is Labs 3-4. No git commit, tag, or push.
+
+## Day 4, Lab 3 — Hash the exact source environment
+
+- **The idea.** Lab 2 built the fingerprint tool; this lab points it at
+  the thing an approval must be tied to - the **source environment**, the
+  whole agent inventory a reviewer looks at (every agent, its owner, its
+  tools, its flags, and the order of the list). When a human approves a
+  remediation we record `sha256_value(environment)` alongside the
+  decision. Right before anything is applied, software re-computes that
+  fingerprint from the *current* environment: match ⇒ the environment is
+  provably unchanged since review and the approval still means something;
+  mismatch ⇒ the approval is **stale** and a human must look again. This
+  is how "approval" stops being a loose label and becomes a claim about a
+  specific, verifiable input.
+- **No new function - and why.** The reviewed starter-kit
+  `proposal_hash.py` has only `canonical_json` + `sha256_value`. There is
+  no dedicated "hash the environment" helper: product code just calls
+  `sha256_value(environment)` directly (in the starter,
+  `v4_service.py` does `source_hash = sha256_value(environment)` and
+  passes it into `build_proposal(...)` and `decide(...)`). The behaviour
+  this lab names already exists as of Lab 2. So Lab 3's real work is to
+  *prove and document* that `sha256_value` fingerprints a realistic
+  multi-agent environment the way we need, and to make the binding chain
+  explicit with a test.
+- **What the new tests establish.**
+  - *Stable across key order* - the same 2-agent inventory built with
+    keys inserted in a different order in every dict hashes identically.
+    Dict key order is presentation; `canonical_json` sorts it away.
+  - *Agent-list order IS part of "exact"* - reversing the `agents` list
+    changes the digest. A list is ordered data; unlike dict keys we do
+    **not** sort it, because "Agent A then Agent B" can be a meaningful
+    fact about an inventory.
+  - *Any reviewed detail matters* - flipping one agent's
+    `human_approval_required`, or adding one tool to one agent, changes
+    the digest. There is no "small enough to ignore" change.
+  - *Realistic environment still yields 64 lowercase hex* - the fingerprint
+    shape does not depend on input size.
+  - *Binding demonstration (the learning goal)* - hash the environment →
+    `build_proposal("REQUIRE_HUMAN_APPROVAL", agent, source_hash)` →
+    `decide(..., source_hash, "APPROVE", ...)` → `validate_approval`
+    passes while the environment is unchanged; then a second agent's
+    approval flag is turned on, the hash is recomputed, and
+    `validate_approval` raises `source changed`.
+- **New terms:**
+  - **Source environment** - the complete input inventory under review
+    (all agents and their configuration), as opposed to a single proposal
+    or a single agent.
+  - **Provenance binding** - attaching a decision to a fingerprint of the
+    exact data it was made about, so the decision cannot silently apply
+    to different data later.
+  - **Stale approval** - an approval whose bound fingerprint no longer
+    matches current reality; treated as invalid, forcing fresh review.
+  - **Ordered data** - a sequence where position carries meaning, so
+    `[A, B]` and `[B, A]` are different values that hash differently.
+  - **Time-of-check to time-of-use (TOCTOU)** - the window between when
+    something is reviewed and when it is acted on; re-checking the source
+    hash at apply time closes that window for the environment.
+- **Input / processing / output / security boundary.** Input: a source
+  environment dict (synthetic, inline in the test - the 3-agent
+  `connected_environment/agents.json` shape). Processing:
+  `sha256_value(environment)`; the resulting hash then flows through
+  `build_proposal(..., source_sha256=...)`, `decide(..., source_sha256=...)`,
+  and `validate_approval(...)`. Output: a 64-char digest; and in the
+  binding test, a pass when unchanged and a `ValueError` matching
+  `source changed` when the environment moved. Security boundary: pure,
+  in-memory, no network, no model call, no secret, no git. `scanner.py`
+  remains the sole risk authority - the hash only ever answers "is this
+  the same environment that was reviewed?" and never scores or decides.
+- **Verification.** `python -m pytest -q tests/test_proposal_hash.py
+  tests/test_approval.py` → `27 passed` (16 in `test_proposal_hash.py`:
+  the 10 from Lab 2 plus 6 new; 11 unchanged in `test_approval.py`). Full
+  suite → `350 passed` (`344 + 6`). `python scripts/run_release_gate.py`
+  still ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall
+  -q .` is clean.
+- **Why this lab exists.** An approval that is not tied to a specific
+  reviewed state is worthless the moment the state changes - it could be
+  replayed against a different inventory, or block valid work because
+  "something" changed but no one can say what. Fingerprinting the exact
+  source environment turns "I approved this" into "I approved *this
+  inventory, byte for byte*", which is the claim an auditor and the
+  apply-time check both need.
+- **What this lab did not do.** No new function in `proposal_hash.py`, no
+  change to `approval.py` (the `workflow_id` / `decided_at` fields are
+  Day 4 Lab 5), no `verifier.py`, no audit DB, no `v4_service.py`
+  orchestration (that wiring is later). The proposal itself is hashed in
+  Lab 4. No git commit, tag, or push.
+
+## Day 4, Lab 4 — Hash the complete remediation proposal
+
+- **The idea.** Lab 3 fingerprinted the source environment; this lab
+  fingerprints the other half of the binding - the **complete**
+  `RemediationProposal`. A proposal has five fields, and a reviewer
+  approves *all five*: the intent (`template_id`), the target
+  (`agent_name`), the field and the value inside `field_changes`, and the
+  `rationale`. The proposal hash is `sha256_value(proposal.to_dict())`
+  over all of them. It is recorded in the approval and re-checked by
+  `validate_approval()` at apply time. Change *which* agent, *which*
+  field, *what* value - or even the wording of the rationale - and the
+  digest changes, so the old approval is refused as stale and a human
+  must look again.
+- **"Complete" is the point.** The hash is not over the diff alone; it is
+  over the whole record. If it only covered `field_changes`, someone
+  could keep an approval while re-pointing the same change at a different
+  agent, or swapping the template. Hashing all five fields means the
+  approval is pinned to the exact proposal that was read, top to bottom.
+- **No new function - and why.** Same as Lab 3: the reviewed starter
+  `proposal_hash.py` has only `canonical_json` + `sha256_value`, and a
+  proposal is hashed by calling `sha256_value(proposal.to_dict())`
+  directly (starter `v4_service.py`, `evals/run_v4_evals.py`).
+  `RemediationProposal.to_dict()` (an `asdict` of the five fields)
+  already exists from Day 3 Lab 3. So this lab adds no code to
+  `proposal_hash.py` or `approval.py` - it proves and documents the
+  three-dimension invalidation.
+- **What the new tests establish (one dimension changed at a time).**
+  Because `RemediationProposal.__post_init__` only requires
+  `field_changes` to be a non-empty dict (it does not tie the keys to the
+  template), a test can build one baseline proposal and vary exactly one
+  thing:
+  - *target* - different `agent_name` ⇒ different proposal hash.
+  - *field* - `field_changes` key `human_approval_required` → `owner`
+    (same template) ⇒ different hash.
+  - *value* - `{"owner": "Team A"}` vs `{"owner": "Team B"}` ⇒ different
+    hash.
+  - *intent* - `template_id` `REQUIRE_HUMAN_APPROVAL` → `ASSIGN_OWNER`
+    ⇒ different hash.
+  - *rationale* - reworded justification alone ⇒ different hash.
+  - *source hash* - a different `source_sha256` ⇒ different hash
+    (the environment binding is inside the proposal too).
+  - *determinism* - two proposals with identical fields hash equal.
+  - *binding (the learning goal)* - approve the hash of a proposal whose
+    `owner` value is "Team A"; `validate_approval` passes while the
+    proposal is unchanged; edit the value to "Team B", recompute the
+    hash, and `validate_approval` raises `proposal changed`.
+- **New terms:**
+  - **Complete / whole-record hash** - hashing the entire object, not
+    just the changed portion, so any edit anywhere in it is detectable.
+  - **Target** - the single agent a proposal acts on (`agent_name`).
+  - **Field vs value** - the *key* being changed (`owner`) versus the
+    *data* written into it (`"Team A"`); both live in `field_changes` and
+    both are covered by the hash.
+  - **Approval invalidation** - a prior approval automatically ceases to
+    be valid the moment the proposal it was about changes.
+  - **Fail closed** - when an input no longer matches what was approved,
+    the safe default is to refuse, not to proceed.
+- **Input / processing / output / security boundary.** Input: a
+  `RemediationProposal` (synthetic, built in-test). Processing:
+  `proposal.to_dict()` → `sha256_value(...)`; the digest then flows
+  through `decide(...)` and `validate_approval(...)`. Output: a 64-char
+  digest; in the binding test, a pass when unchanged and a `ValueError`
+  matching `proposal changed` when any field moved. Security boundary:
+  pure, in-memory, no network, no model call, no secret, no git.
+  `scanner.py` stays the sole risk authority - the hash only answers "is
+  this the same proposal that was approved?" and never scores or decides.
+- **Verification.** `python -m pytest -q tests/test_proposal_hash.py
+  tests/test_approval.py` → `35 passed` (24 in `test_proposal_hash.py`:
+  16 from Labs 2-3 plus 8 new; 11 unchanged in `test_approval.py`). Full
+  suite → `358 passed` (`350 + 8`). `python scripts/run_release_gate.py`
+  still ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall
+  -q .` is clean.
+- **Why this lab exists.** Approval is only meaningful if it cannot be
+  quietly stretched. Without a whole-proposal hash, a reviewer could
+  approve "add an owner to the billing agent" and the same approval token
+  would still validate "remove all tools from the deployment agent". The
+  complete hash makes the approval mean exactly one thing, and makes any
+  later edit - target, field, value, or wording - force a fresh review.
+- **What this lab did not do.** No new function in `proposal_hash.py`, no
+  change to `approval.py` (`workflow_id` / `decided_at` are Day 4 Lab 5),
+  no `verifier.py`, no audit DB, no `v4_service.py` orchestration. The
+  proposal hash is not yet *stored* anywhere - it is computed and
+  compared in memory only. No git commit, tag, or push.
+
+## Day 4, Lab 5 — Create the ApprovalRecord data contract
+
+- **The idea.** Labs 2-4 built the two fingerprints an approval binds to.
+  This lab finishes the `ApprovalRecord` itself so it stands alone as
+  **audit evidence**: one frozen object that answers every question an
+  auditor asks without any external lookup - who decided, what they
+  decided, why, when, and against exactly which proposal and environment.
+  It had five fields; this lab adds the two that were missing:
+  `workflow_id` (which end-to-end run) and `decided_at` (when).
+- **The five evidence roles, now all present.**
+  - *who* → `reviewer`
+  - *what* → `decision` (APPROVE / REJECT) + `proposal_sha256` +
+    `source_sha256`
+  - *why* → `reason`
+  - *when* → `decided_at` (UTC, ISO-8601)
+  - *which run* → `workflow_id`
+- **What changed in `approval.py`.**
+  - `ApprovalRecord` is now a frozen 7-field dataclass (`workflow_id`
+    first, `decided_at` last). `to_dict()` is unchanged - `asdict` just
+    returns seven keys instead of five, which is what the audit log will
+    store.
+  - `decide()` takes `workflow_id` as its first argument and stamps
+    `decided_at = datetime.now(timezone.utc).isoformat()` itself, so the
+    caller cannot forge the time and the record always carries one.
+  - Validation is unchanged in spirit: `decision` must be APPROVE or
+    REJECT; `reviewer` and `reason` are stripped and must be non-empty.
+    `workflow_id` is **not** stripped or checked, on purpose - it is a
+    system-generated identifier, not human free text.
+  - `validate_approval()` is byte-for-byte the same three checks
+    (APPROVE, proposal hash matches, source hash matches). It
+    deliberately ignores `workflow_id` and `decided_at`: those are
+    metadata for the trail, not part of "does this approval still apply?"
+- **Frozen = evidence, not a note.** A `@dataclass(frozen=True)` rejects
+  attribute assignment after construction (`record.decision = "REJECT"`
+  raises `FrozenInstanceError`). That immutability is the whole point: an
+  approval you could edit afterwards proves nothing.
+- **New terms:**
+  - **Data contract** - an agreed, enforced shape for a piece of data
+    (which fields, what types, what is required) that other code can rely
+    on.
+  - **`workflow_id`** - an identifier tying this record to one
+    remediation run (discover → propose → approve → verify), so every
+    event of that run can be pulled together later.
+  - **`decided_at`** - the timestamp of the moment `decide()` ran.
+  - **ISO-8601** - the standard machine-readable date/time text format,
+    e.g. `2026-08-29T14:03:22.481930+00:00`.
+  - **Timezone-aware / UTC** - a timestamp that carries its offset from
+    Coordinated Universal Time, so it is unambiguous anywhere; "aware"
+    means it knows its zone, versus "naive" which has none attached.
+  - **Frozen dataclass** - a Python class whose instances cannot be
+    modified after they are created.
+  - **Audit metadata** - fields kept for the record but not used by a
+    security check (`validate_approval` ignores `workflow_id` /
+    `decided_at`).
+- **Input / processing / output / security boundary.** Input:
+  `decide(workflow_id, proposal_sha256, source_sha256, reviewer,
+  decision, reason)` - synthetic in tests. Processing: validate the
+  decision and the human fields, stamp the UTC timestamp, construct the
+  frozen record. Output: an `ApprovalRecord`; `to_dict()` gives the
+  7-key dict destined for the audit log. Security boundary: pure,
+  in-memory, no network, no model call, no secret, no git.
+  `validate_approval()` is unchanged, so the approval-matching guarantee
+  is exactly as strong as before. `scanner.py` stays the sole risk
+  authority - an approval records a human's intent, it never sets a
+  score.
+- **Verification.** `python -m pytest -q tests/test_proposal_hash.py
+  tests/test_approval.py` → `40 passed` (24 unchanged in
+  `test_proposal_hash.py` with the two `decide()` calls updated to pass a
+  `workflow_id`; `test_approval.py` goes 11 → 16 with five new contract
+  tests: seven-field shape, verbatim `workflow_id`, UTC ISO `decided_at`,
+  frozen record, and the new fields not affecting the match). Full suite
+  → `363 passed` (`358 + 5`). `python scripts/run_release_gate.py` still
+  ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .`
+  is clean.
+- **Why this lab exists.** A remediation that changes production access
+  has to leave a record a compliance reviewer can read months later and
+  fully reconstruct: which run, who signed off, when, on what grounds,
+  and against precisely which proposed change and starting state. Making
+  that record a frozen, self-contained contract - rather than a log line
+  assembled from several places - is what turns "we have approvals" into
+  "we have auditable approvals."
+- **What this lab did not do.** No approve/reject product wiring (Lab 6),
+  no new stale-rejection logic (`validate_approval` already rejects
+  changed hashes; Lab 7 tests it harder), no `verifier.py`, no audit DB,
+  no `v4_service.py`. `workflow_id` is not yet *generated* anywhere -
+  callers pass a literal string. No git commit, tag, or push.
+
+## Day 4, Lab 6 — Implement approve and reject decisions
+
+- **The idea.** The learning goal is "how the product records an explicit
+  human choice." Approve and reject are the two branches of one entry
+  point, `approval.decide()`. Two properties make the choice *explicit*
+  rather than assumed: (1) there is **no default** - a missing, blank, or
+  misspelled decision is refused, not guessed; (2) a **REJECT is stored
+  as full evidence** - the same 7-field `ApprovalRecord` as an APPROVE,
+  carrying who rejected, why, and when. A rejection is a logged outcome,
+  not an empty result.
+- **No code was added - and why.** `decide()` (Day 3 Lab 4, extended Day
+  4 Lab 5) already does all of this: `decision` must be exactly `APPROVE`
+  or `REJECT`; `reviewer` and `reason` are stripped and required for
+  *either* branch; the record is frozen. The reviewed starter
+  `approval.py` is the final state and is behaviourally identical - and
+  it has **no** `approve()` / `reject()` wrapper functions, on purpose.
+  One entry point means one code path, so both outcomes are validated and
+  recorded the same way. This lab adds the tests that pin that design
+  down.
+- **What the new tests establish.**
+  - *REJECT is full evidence* - `decide("wf-9","p","s","Dana","REJECT",
+    "Tool list still too broad")` returns a record with `decision ==
+    "REJECT"`, populated `reviewer` / `reason` / `workflow_id` /
+    `decided_at`, and a `to_dict()` whose keys are identical to an
+    APPROVE record's.
+  - *A reason is required for REJECT too* - `decide(..., "REJECT", "  ")`
+    raises `reviewer and reason are required`. You cannot reject
+    silently any more than you can approve silently.
+  - *No default, exact spelling only* - `""`, `"PENDING"`, `"approve"`,
+    `"Approve"`, `" APPROVE "`, `"YES"`, `"NO"`, `"rejected"` each raise
+    `decision must be APPROVE or REJECT`. `decision` is compared raw
+    (not stripped, not upper-cased), so the product never interprets a
+    sloppy value - it rejects it.
+  - *Both outcomes are the same shape* - an APPROVE record and a REJECT
+    record have identical `to_dict()` keys; only `decision`, the human's
+    `reason`, and the wall-clock `decided_at` differ.
+- **New terms:**
+  - **Explicit decision** - a choice the actor must actively state; the
+    absence of input is not itself a decision.
+  - **Deny by default / fail-safe default** - when no valid choice is
+    present, the safe outcome is "do not proceed."
+  - **First-class outcome** - REJECT is handled and stored with the same
+    rigour as APPROVE, not as an error or an empty case.
+  - **Non-coercing validation** - the input is checked as given;
+    `decide()` does not "fix" `" approve "` into `APPROVE`.
+  - **Evidence of refusal** - a stored record showing a human considered
+    a change and declined it, with a stated reason.
+- **Input / processing / output / security boundary.** Input: `decide()`
+  calls with `decision` = APPROVE / REJECT / junk (synthetic in tests).
+  Processing: compare `decision` raw against `{"APPROVE","REJECT"}`;
+  strip and require `reviewer` and `reason`; stamp `decided_at`; build
+  the frozen record. Output: an `ApprovalRecord` for a valid choice; a
+  `ValueError` for anything blank or misspelled. Security boundary: pure,
+  in-memory, no network, no model call, no secret, no git.
+  `validate_approval()` is unchanged - only `APPROVE` lets a proposal
+  proceed, so a REJECT record blocks the change exactly like "no record"
+  would, but with an auditable reason attached. `scanner.py` stays the
+  sole risk authority.
+- **Verification.** `python -m pytest -q tests/test_proposal_hash.py
+  tests/test_approval.py` → `51 passed` (`test_proposal_hash.py`
+  unchanged at 24; `test_approval.py` 16 → 27 with 11 new assertions:
+  the REJECT-evidence test, the REJECT-reason test, an 8-case
+  exact-spelling parametrisation, and the same-shape test). Full suite →
+  `374 passed` (`363 + 11`). `python scripts/run_release_gate.py` still
+  ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .`
+  is clean.
+- **Why this lab exists.** In an enterprise remediation flow, "not
+  approved" and "rejected" must not look the same to the audit trail. A
+  system that only records approvals cannot show that a risky change was
+  *considered and declined*, or by whom, or on what grounds. Forcing an
+  explicit APPROVE/REJECT with a reason for either - through one
+  validated entry point - makes every review a positive, attributable
+  act that the trail can reconstruct.
+- **What this lab did not do.** No `approve()` / `reject()` wrappers
+  (starter has none), no change to `approval.py` or `proposal_hash.py`,
+  no workflow `REJECTED` terminal state (Day 5), no `verifier.py`, no
+  audit DB, no `v4_service.py` wiring, no Streamlit approve/reject
+  buttons (Day 9). No git commit, tag, or push.
+
+## Day 4, Lab 7 — Reject changed proposal and changed source hashes
+
+- **The idea.** An approval is bound to two fingerprints: the exact
+  proposal reviewed (`proposal_sha256`) and the exact environment it was
+  built against (`source_sha256`). A **stale approval** is one whose
+  subject has changed since it was granted. The learning goal is that
+  stale approval is blocked **automatically** - no human has to spot the
+  drift. `validate_approval(record, proposal_sha256, source_sha256)` is
+  the enforcement point: it runs right before a change would be applied,
+  re-checks both fingerprints against what is actually in hand, and
+  raises `ValueError` if either moved.
+- **The three checks, in fixed order.**
+  1. `record.decision != "APPROVE"` → `"The proposal was not approved."`
+  2. `record.proposal_sha256 != proposal_sha256` → `"Approval is stale
+     because the proposal changed."`
+  3. `record.source_sha256 != source_sha256` → `"Approval is stale
+     because the source changed."`
+  Order matters: decision first, then proposal, then source. If both the
+  proposal and the source have drifted, the caller sees `proposal
+  changed` - the first failing check wins.
+- **No code was added - and why.** `validate_approval()` already does all
+  of this and matches the reviewed starter byte-for-byte in behaviour
+  (same three messages, same order). Labs 3-4 built the fingerprints;
+  this lab adds the tests that prove the gate fires on realistic drift
+  and, just as importantly, does *not* fire on a deterministic rebuild.
+- **What the new tests establish (realistic full-flow scenarios).**
+  - *Source drift* - approve a real proposal, then widen a different
+    agent's tool list, recompute `sha256_value(env)` →
+    `validate_approval` raises `source changed`.
+  - *Proposal drift* - regenerate the proposal against a *different
+    target agent*, hash it → raises `proposal changed`.
+  - *Check order* - both hashes changed → the message is `proposal
+    changed`.
+  - *No false stale* - rebuild the *identical* proposal from the
+    *untouched* inputs; its hash equals the approved hash and
+    `validate_approval` passes. Re-deriving the same proposal is not
+    drift - the gate is precise, not paranoid. This is the test that
+    stops the check from "crying wolf".
+  - *Guard, not boolean* - `validate_approval(...)` returns `None` on
+    success; a caller must treat "no exception" as the pass signal.
+- **New terms:**
+  - **Stale approval** - an approval no longer valid because the proposal
+    or environment it was bound to has changed.
+  - **Enforcement point / automatic gate** - a check the code always runs
+    at a fixed step, so safety does not depend on anyone remembering to
+    look.
+  - **Fail closed** - on any mismatch or doubt, refuse; do not proceed.
+  - **Guard function** - a function that raises on a bad state and
+    returns nothing on a good one.
+  - **Drift** - the reviewed state and the current state diverging over
+    time.
+  - **False stale ("crying wolf")** - wrongly flagging unchanged content
+    as changed; a deterministic rebuild must not trigger it.
+- **Input / processing / output / security boundary.** Input: an
+  `ApprovalRecord` plus the proposal hash and source hash computed *now*,
+  at apply time (synthetic in tests). Processing: three equality checks
+  in fixed order against the record's stored hashes. Output: `None` on an
+  exact match; a specific `ValueError` on any mismatch. Security
+  boundary: pure, in-memory, no network, no model call, no secret, no
+  git. `scanner.py` stays the sole risk authority - this gate only
+  answers "is this still the approved thing?".
+- **Verification.** `python -m pytest -q tests/test_proposal_hash.py
+  tests/test_approval.py` → `56 passed` (`test_proposal_hash.py`
+  unchanged at 24; `test_approval.py` 27 → 32 with 5 new tests: source
+  drift, proposal drift, check order, no-false-stale rebuild, guard
+  returns `None`). Full suite → `379 passed` (`374 + 5`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** Between the moment a reviewer signs off and the
+  moment a change is applied, the world can move - another engineer edits
+  an agent, a proposal is regenerated with a different target. Without an
+  automatic re-check, the old approval would still "work" and authorise a
+  change nobody actually reviewed. Re-verifying the two fingerprints at
+  the enforcement point makes every approval good for exactly one state
+  of the world, and forces a fresh human review the instant that state
+  changes.
+- **What this lab did not do.** No change to `approval.py` or
+  `proposal_hash.py` (the stale check already exists), no `verifier.py`,
+  no audit DB, no `v4_service.py` wiring. Replay-prevention and the full
+  exact-vs-stale test matrix are Day 4 Lab 8. No git commit, tag, or
+  push.
+
+## Day 4, Lab 8 — Write exact approval and stale approval tests
+
+- **The idea.** Day 4's capstone test lab. An `ApprovalRecord` is a
+  **one-time authorization token**: it is valid for exactly one triple -
+  `decision == APPROVE`, the stored `proposal_sha256`, and the stored
+  `source_sha256` - and nothing else. This lab writes the **negative
+  tests** (tests that assert a bad action *fails*) that prove the token
+  cannot be **replayed**: reused for a different proposal, against the
+  environment as it looks after the change was applied, a second time, or
+  by editing the record.
+- **No code was added.** `validate_approval()` already enforces the exact
+  triple (Day 3 Lab 4, hardened Labs 5-7) and matches the reviewed
+  starter. The starter's own replay check lives in
+  `evals/run_v4_evals.py`, which is a Day 5 lab in this course. Lab 8 is
+  the focused test set plus this summary.
+- **What the new tests prove.**
+  - *Only the exact triple validates* - a parametrised table: `(real
+    proposal hash, real source hash)` passes; perturb the proposal hash,
+    the source hash, or both, and `validate_approval` raises. One test,
+    four rows, the whole guarantee visible at once.
+  - *A REJECT token never validates* - even with both hashes correct, a
+    REJECT record raises `not approved`. A rejection cannot be replayed
+    as an approval.
+  - *Cross-proposal replay fails* - an approval for a
+    `REQUIRE_HUMAN_APPROVAL` proposal cannot validate an `ASSIGN_OWNER`
+    proposal built against the same environment - `proposal changed`.
+  - *An approval is spent once the change is applied* - approve P against
+    env E (valid at apply time); run `apply_proposal_to_environment(E, P)`
+    → E'; the same record fails against `sha256_value(E')` with `source
+    changed`, and fails again on a second attempt. One approval, one
+    application, one pre-state.
+  - *A stale approval cannot be repaired by tampering* -
+    `record.proposal_sha256 = "forged"` raises `FrozenInstanceError`; a
+    fresh valid record can only come from `decide()`, which demands a
+    reviewer and reason and stamps its own timestamp.
+- **New terms:**
+  - **Negative test** - asserts that an invalid input is rejected
+    (raises), rather than that a valid one is accepted.
+  - **Replay attack** - reusing a still-well-formed token to authorise an
+    action it was not issued for.
+  - **One-time / single-use authorization** - valid for one action
+    against one pre-state; invalid once that state changes.
+  - **Pre-state / post-state** - the environment an approval was granted
+    against (`source_sha256`) versus the environment after the change
+    lands; the token matches only the pre-state.
+  - **Truth table (in a test)** - a parametrised test listing input
+    combinations and their expected pass/fail.
+  - **Tamper-resistance** - a stale approval cannot be edited to look
+    fresh; a replacement must go through `decide()`.
+- **Input / processing / output / security boundary.** Input: an
+  `ApprovalRecord` plus proposal/source hashes representing replay
+  attempts (synthetic; `apply_proposal_to_environment` models the world
+  after apply). Processing: call `validate_approval()` and assert it
+  raises, or returns `None` for the single exact case. Output: test
+  results only - no product behaviour changed. Security boundary: pure,
+  in-memory, no network, no model call, no secret, no git. `scanner.py`
+  stays the sole risk authority.
+- **Verification.** `python -m pytest -q tests/test_proposal_hash.py
+  tests/test_approval.py` → `64 passed` (`test_proposal_hash.py`
+  unchanged at 24; `test_approval.py` 32 → 40 with 8 new tests: the
+  four-row exact-triple table, reject-token, cross-proposal replay,
+  spent-once-applied, and no-repair-by-tampering). Full suite → `387
+  passed` (`379 + 8`). `python scripts/run_release_gate.py` still ends
+  `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .` is
+  clean.
+- **Why this lab exists.** In an enterprise flow an approval is a
+  credential, and credentials get reused - by mistake or on purpose.
+  Proving with tests that one approval authorises exactly one change
+  against exactly one starting state, and that no edit or second attempt
+  slips past, is what lets a reviewer trust that "approved" cannot quietly
+  become "approved for something else."
+- **What this lab did not do.** No change to `approval.py` /
+  `proposal_hash.py`, no `evals/run_v4_evals.py` (Day 5 Lab 6), no
+  `verifier.py`, no audit DB, no `v4_service.py`. No git commit, tag, or
+  push.
+
+## Day 4 Summary — Labs 1 through 8
+
+1. **Understand canonical JSON and SHA-256** - a fingerprint is only
+   trustworthy if the same content always hashes the same; `json.dumps`
+   alone does not guarantee that (dict order, whitespace).
+2. **Build canonical JSON and sha256_value helpers** - `canonical_json()`
+   (`sort_keys=True`, `separators=(",", ":")`, `ensure_ascii=True`) and
+   `sha256_value()` hashing it; dropped `default=str` so non-JSON types
+   raise instead of being coerced.
+3. **Hash the exact source environment** - `sha256_value(environment)`
+   fingerprints the whole agent inventory; key order does not matter,
+   agent-list order does, any changed field does. No new function.
+4. **Hash the complete remediation proposal** -
+   `sha256_value(proposal.to_dict())` covers all five fields; a changed
+   target, field, value, template, or rationale changes the digest. No
+   new function.
+5. **Create the ApprovalRecord data contract** - added `workflow_id` and
+   `decided_at`, making the frozen record answer who / what / why / when /
+   against-exactly-what on its own; `validate_approval` unchanged and
+   ignores the two new fields.
+6. **Implement approve and reject decisions** - one entry point,
+   `decide()`, with no default: a blank or misspelled decision is
+   refused, and a REJECT is recorded as full evidence, same shape as an
+   APPROVE.
+7. **Reject changed proposal and changed source hashes** -
+   `validate_approval()` is the automatic gate: decision → proposal →
+   source, first failing check wins; a deterministic rebuild is not
+   treated as drift.
+8. **Write exact approval and stale approval tests** - the negative-test
+   set proving one approval is valid for exactly one triple and cannot be
+   replayed for another proposal, a post-apply environment, a second
+   application, or a tampered record.
+
+**Where Day 4 leaves off:** canonical hashing (`proposal_hash.py`:
+`canonical_json`, `sha256_value`) and the full audit-evidence
+`ApprovalRecord` (`approval.py`: 7 fields, `decide`, `validate_approval`)
+exist and are tested. They are not yet wired into an orchestrator, a
+durable audit log, or a post-apply verifier - `decide()` callers pass a
+literal `workflow_id`, and nothing persists a record or re-scans an
+applied change. Everything since the Day 1 baseline commit `517db77` is
+uncommitted on `v4-development`; the suite is at `387 passed`. Day 5
+builds the explicit workflow state machine
+(DISCOVERED→SCANNED→PROPOSED→APPROVED→VERIFIED plus terminal
+REJECTED/FAILED) and a SQLite audit-event log so every transition becomes
+durable, ordered evidence.
+
+## Day 5, Lab 1 — Understand workflow states and terminal states
+
+- **The idea.** A remediation is a multi-step process, and each step
+  proves something new about the change: that it was discovered, that it
+  was scanned, that a human approved *this exact* proposal, that it was
+  verified in isolation. v4 models that process as a **state machine** so
+  the system always knows, explicitly, how far a change has actually
+  got - and therefore which safety checks have genuinely passed and which
+  have not. The state is the record; if the process cannot say "I am only
+  at PROPOSED", nothing stops it behaving as if it were APPROVED.
+- **The nine v4 states** (happy path, then the two alternate endings):
+  - `DISCOVERED` - the agent inventory has been read in (read-only), with
+    a SHA-256 provenance hash.
+  - `SCANNED` - v1's deterministic findings and risk score are attached;
+    the score is authoritative and fixed.
+  - `PROPOSED` - one allowlisted `RemediationProposal` exists; it
+    *describes* a bounded change and cannot apply it.
+  - `APPROVED` - a human `ApprovalRecord` exists, bound to the proposal
+    hash and the source hash; still no real configuration is touched.
+  - `VERIFIED` - the approved change was applied to a throwaway copy and
+    re-scanned, and every verification check passed.
+  - `DRAFT_PR_CREATED` - a draft pull request exists on the separate,
+    private, synthetic demo repo; it cannot be merged automatically.
+  - `ROLLED_BACK` - that draft PR was closed and its branch deleted.
+  - `REJECTED` *(terminal)* - a human rejected the proposal or withheld
+    approval.
+  - `FAILED` *(terminal)* - a required check failed; the workflow stops,
+    fail-closed.
+- **Terminal vs active.** A **terminal state** has no outgoing
+  transition - the workflow is over. `REJECTED` and `FAILED` are always
+  terminal; `ROLLED_BACK` is terminal in practice. Every other state is
+  *active*: it has at least one forward transition and can also drop to
+  `FAILED`.
+- **Every transition is a gated trust boundary.** The arrows are not
+  free: `SCANNED → PROPOSED` requires an allowlisted template;
+  `PROPOSED → APPROVED` requires an explicit human decision;
+  `APPROVED → VERIFIED` re-checks the proposal and source hashes (Day 4);
+  `VERIFIED → DRAFT_PR_CREATED` requires an allowlisted repo/branch/path
+  and an opted-in live run. Knowing the current state is what lets each
+  gate refuse a step that has not earned its way there.
+- **State-skipping is rejected.** A transition that is not on the map -
+  `PROPOSED → VERIFIED`, say - is refused outright. You cannot reach
+  `VERIFIED` without passing through `APPROVED`, so you cannot verify a
+  change no human approved.
+- **New terms:**
+  - **State machine** - a process modelled as a fixed set of named states
+    plus a fixed map of allowed transitions; the process is always in
+    exactly one state.
+  - **State** - one named stage of the workflow.
+  - **Transition** - one allowed step from one state to another; only
+    mapped steps are permitted.
+  - **Terminal state** - a state with no outgoing transition; the
+    workflow stops there.
+  - **Active state** - a non-terminal state, with at least one forward
+    transition.
+  - **State-skipping** - attempting a transition that is not on the map;
+    rejected.
+  - **Fail closed** - on any failed check, move to a terminal state
+    (`FAILED`), never continue anyway.
+  - **Gate / trust boundary at a transition** - the specific check that
+    must pass for one particular arrow to be taken.
+- **Input / processing / output / security boundary.** Input: the state
+  diagram and per-state data/authority/gate table already written in
+  `docs/v4_architecture.md` (Day 1 Lab 7), and the reviewed starter
+  `workflow.py`. Processing: understanding only - no code, no
+  computation. Output: this learning-log entry. Security boundary: pure
+  documentation - no code path, no network, no model call, no secret, no
+  git. `scanner.py` stays the sole risk authority: the state machine
+  *orders and gates* the workflow, it never scores anything.
+- **Verification.** No behaviour changed. `python -m pytest -q
+  tests/test_workflow.py tests/test_audit_db.py` reports `file or
+  directory not found` - both files are built later in Day 5 (Lab 2+ and
+  Lab 4+), so their absence now is expected, not a failure. Full suite
+  still `387 passed`; `python scripts/run_release_gate.py` still ends
+  `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .` is
+  clean.
+- **Why this lab exists.** Autonomous action is dangerous precisely
+  because a process can lose the plot - retrying a half-finished step,
+  acting on stale approval, or jumping straight to "apply". A state
+  machine makes the workflow's progress an explicit, checkable fact:
+  there is exactly one current state, exactly one set of legal next
+  steps, and a clear stop. That is the backbone every later Day 5 lab
+  hangs off - transition validation, and a durable audit event for every
+  step.
+- **What this lab did not do.** No `workflow.py`, no `audit_db.py`, no
+  `docs/v4_state_machine.md` (Day 5 Lab 2), no test files, no
+  `transition()` logic, no SQLite. No git commit, tag, or push.
+
+## Day 5, Lab 2 — Define the v4 state list and transition map
+
+- **The idea.** v4 already allowlists tools (the MCP server is exactly
+  five read-only tools) and remediations (exactly three templates). This
+  lab applies the same principle to the *process*: `workflow.py` defines
+  `STATES` - the nine states a remediation may be in - and
+  `ALLOWED_TRANSITIONS` - for each state, the exact set of states it may
+  move to next. A state or step not written in the map is refused. This
+  lab is the map as data; Lab 3 adds `transition()`, the guard that
+  enforces it.
+- **What `workflow.py` contains.**
+  - `STATES` - a 9-tuple in workflow order:
+    `DISCOVERED, SCANNED, PROPOSED, APPROVED, VERIFIED, DRAFT_PR_CREATED,
+    ROLLED_BACK, REJECTED, FAILED`.
+  - `ALLOWED_TRANSITIONS` - a dict whose values are `set`s. An empty set
+    means the state is terminal. The map:
+    `DISCOVERED→{SCANNED,FAILED}`, `SCANNED→{PROPOSED,FAILED}`,
+    `PROPOSED→{APPROVED,REJECTED,FAILED}`, `APPROVED→{VERIFIED,FAILED}`,
+    `VERIFIED→{DRAFT_PR_CREATED,FAILED}`,
+    `DRAFT_PR_CREATED→{ROLLED_BACK}`, and `ROLLED_BACK / REJECTED /
+    FAILED → {}`.
+  - `TERMINAL_STATES` - **derived** from the map
+    (`frozenset(s for s, nxt in ALLOWED_TRANSITIONS.items() if not nxt)`),
+    so it can never drift from it: `{ROLLED_BACK, REJECTED, FAILED}`.
+  - `START_STATE = "DISCOVERED"` - nothing transitions into it.
+  - `WorkflowState` - a frozen dataclass (`workflow_id`, `state`); you
+    move by building a new one, never by mutating.
+  - `is_terminal(state)` - a one-line predicate.
+- **Shape choices worth noting.**
+  - Only `PROPOSED` leads to `REJECTED`. Withdrawing sign-off *after*
+    approval is a `FAILED`, not a `REJECTED` - "rejected" means a human
+    said no to the proposal itself.
+  - The five pre-GitHub active states can each drop to `FAILED` on a
+    failed check. `DRAFT_PR_CREATED` has a single exit, `ROLLED_BACK`:
+    once a draft PR exists on GitHub, undoing it is a reversal, not a
+    failure.
+- **Reconciliation item.** `docs/v4_architecture.md` (Day 1 Lab 7)
+  sketched two arrows the reviewed code does not implement -
+  `APPROVED → REJECTED` and `DRAFT_PR_CREATED → FAILED` - plus a prose
+  line about a stale approval going "back to `PROPOSED` / `REJECTED`"
+  with no matching edge. `workflow.py` and the new `docs/v4_state_machine.md`
+  match the reviewed starter and are authoritative; the Day-1 narrative
+  doc is left for a Day 10 Lab 5 reconciliation. `docs/v4_architecture.md`
+  was not edited this lab.
+- **New terms:**
+  - **Allowlist for process movement** - the `ALLOWED_TRANSITIONS` map;
+    only listed state→state steps are legal, everything else denied.
+  - **Transition map** - the whole dict: per state, the complete set of
+    permitted next states.
+  - **Terminal state** - a state mapped to an empty set; the workflow
+    stops there.
+  - **Start state** - the one state a workflow begins in; nothing
+    transitions into it.
+  - **Derived constant** - a value computed from another so the two
+    cannot fall out of sync (`TERMINAL_STATES` from the map).
+  - **Frozen dataclass** - an immutable record; "changing" it means
+    constructing a new instance.
+- **Input / processing / output / security boundary.** Input: the
+  reviewed starter `workflow.py` and the state descriptions in
+  `docs/v4_architecture.md`. Processing: define constants and one
+  immutable record - no runtime logic yet. Output: `workflow.py`,
+  `tests/test_workflow.py`, `docs/v4_state_machine.md`, this entry.
+  Security boundary: pure, in-memory, no network, no model call, no
+  secret, no git. `scanner.py` stays the sole risk authority - the state
+  machine orders and gates the workflow, it never scores.
+- **Verification.** `python -m pytest -q tests/test_workflow.py
+  tests/test_audit_db.py` reports `file or directory not found:
+  tests/test_audit_db.py` - that file is Day 5 Lab 4, so its absence now
+  is expected. `python -m pytest -q tests/test_workflow.py` → `21
+  passed` (map completeness and consistency, terminal states, map shape,
+  start state, happy-path connectivity, a parametrised list of absent
+  state-skips, and `WorkflowState` being frozen). Full suite → `408
+  passed` (`387 + 21`). `python scripts/run_release_gate.py` still ends
+  `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .` is
+  clean.
+- **Why this lab exists.** An allowlist is only useful if it is written
+  down in one place and everything is checked against it. Putting the
+  workflow's legal states and steps in a single map - rather than
+  scattering `if state == ...` checks through the code - is what lets Lab
+  3's guard be short and total, and lets a reviewer see the entire
+  permitted process at a glance.
+- **What this lab did not do.** No `transition()` (Lab 3), no
+  `audit_db.py` / SQLite (Labs 4-5), no `v4_service.py` wiring, no edit
+  to `docs/v4_architecture.md`. No git commit, tag, or push.
+
+## Day 5, Lab 3 — Implement transition validation
+
+- **The idea.** Lab 2 wrote the map; nothing checked it. This lab adds
+  one function, `workflow.transition(current, next_state)`, that is the
+  *only* way a workflow changes state. A legal step returns a new
+  `WorkflowState`; anything else raises a `ValueError` whose message
+  names both states and lists what *was* allowed. State-skipping -
+  `PROPOSED → VERIFIED`, jumping past human approval - stops being either
+  a silent success or an obscure crash and becomes a clear, explainable
+  error.
+- **The guard, in order.**
+  1. `current.state` not in `ALLOWED_TRANSITIONS` →
+     `Unknown current state: '<x>'`.
+  2. `next_state` not in `STATES` → `Unknown target state: '<x>'`.
+  3. `next_state` not in `ALLOWED_TRANSITIONS[current.state]` →
+     `Invalid transition: <from> -> <to>. Allowed from <from>: <sorted
+     list, or 'none - terminal state'>`.
+  4. otherwise → `WorkflowState(current.workflow_id, next_state)` - a new
+     frozen record, same `workflow_id`.
+- **Two small departures from the bare starter, both toward "clear
+  error".** The reviewed starter indexes `ALLOWED_TRANSITIONS[current.state]`
+  with no guard, so a bad current state raises a bare `KeyError`; step 1
+  turns that into a `ValueError` with a message. And the
+  invalid-transition message lists the genuinely-allowed next states, so
+  the exception itself shows the caller the map. Same cases raise as in
+  the starter - only the text is better, and one `KeyError` becomes a
+  `ValueError`.
+- **Terminal states need no special case.** `ALLOWED_TRANSITIONS["FAILED"]`
+  (and `REJECTED`, `ROLLED_BACK`) is an empty set, so any move out of
+  them hits step 3 and the message reads `Allowed from FAILED: none -
+  terminal state`. A self-loop (`DISCOVERED → DISCOVERED`) is rejected
+  the same way - the map has no self-arrows.
+- **Immutability of history.** `transition()` never edits its input; it
+  constructs a new `WorkflowState`. A workflow's life is therefore a
+  chain of distinct frozen records, which is exactly what the Day 5
+  Lab 4-5 audit log will persist.
+- **New terms:**
+  - **Transition validation** - checking a requested state change against
+    the allowlist before applying it.
+  - **Guard function / choke point** - one function every state change
+    must pass through, so the rule lives in a single place.
+  - **State-skipping** - jumping past a required state; now a specific
+    error.
+  - **`KeyError` vs `ValueError`** - `KeyError` is Python's internal
+    "missing dict key" crash; a `ValueError` with a written message is a
+    deliberate, explainable rejection. This lab converts the former to
+    the latter.
+- **Input / processing / output / security boundary.** Input: a
+  `WorkflowState` and a target state string. Processing: three ordered
+  membership checks, then build the new state. Output: a new
+  `WorkflowState` on success; a descriptive `ValueError` on any failure.
+  Security boundary: pure, in-memory, no network, no model call, no
+  secret, no git. `scanner.py` stays the sole risk authority -
+  `transition()` orders and gates the workflow, it never scores. This is
+  the mechanism that makes every trust boundary in
+  `docs/v4_state_machine.md` real.
+- **Verification.** `python -m pytest -q tests/test_workflow.py
+  tests/test_audit_db.py` reports `file or directory not found:
+  tests/test_audit_db.py` - Day 5 Lab 4, expected. `python -m pytest -q
+  tests/test_workflow.py` → `48 passed` (21 from Lab 2 plus 27 new: the
+  happy path through `transition()`, every allowed arrow accepted,
+  new-object semantics, parametrised state-skips, self-loop, unknown
+  target, unknown current, every terminal state as `current`, and a
+  message-content check). Full suite → `435 passed` (`408 + 27`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** An allowlist that is never checked is just a
+  comment. `transition()` is the check - and because it is the single
+  choke point, the enforcement is short, total, and easy to audit: there
+  is exactly one place where a state change can happen, and it always
+  either returns the next legal state or raises. That is what lets the
+  rest of Day 5 (the audit log) assume every recorded step was a legal
+  one.
+- **What this lab did not do.** No `audit_db.py` / SQLite (Labs 4-5), no
+  `v4_service.py` wiring, no edit to `docs/v4_architecture.md` (the Lab 2
+  reconciliation item still stands). No git commit, tag, or push.
+
+## Day 5, Lab 4 — Design the SQLite workflow events table
+
+- **The idea.** Every step of a remediation has to be written down
+  permanently and in order, so an auditor can reconstruct what happened.
+  This lab designs the storage: one table, `workflow_events`, in a local
+  **SQLite** database, plus `audit_db.initialize()` that creates it. The
+  central design decision is that an autoincrementing integer `id` - not
+  the timestamp - carries the order: `ORDER BY id` returns events in the
+  exact sequence they were written, even if two rows share a `created_at`.
+- **The table.**
+  | Column | Type | Role |
+  |---|---|---|
+  | `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | ever-increasing; the ordering key |
+  | `workflow_id` | `TEXT NOT NULL` | which remediation run |
+  | `event_type` | `TEXT NOT NULL` | what happened |
+  | `state` | `TEXT NOT NULL` | workflow state at/after the event |
+  | `created_at` | `TEXT NOT NULL` | UTC ISO-8601 timestamp |
+  | `payload_json` | `TEXT NOT NULL` | the event's data as sorted-key JSON |
+- **`initialize(path)`.** Coerces `path` to a `Path` (so a string still
+  works), makes the parent directory, opens a SQLite connection, and runs
+  the `CREATE TABLE IF NOT EXISTS` schema. `IF NOT EXISTS` makes it
+  **idempotent** - safe to call before every write, creates the table
+  only once.
+- **Why `id`, not `created_at`.** Timestamps are not a reliable order:
+  two events can land in the same millisecond, and a clock can fail to
+  advance or even go backwards. The database guarantees each new row gets
+  a strictly larger `id` than the last, so `id` is a total order that
+  matches insertion order exactly. `created_at` is kept for human
+  readability, not for sorting.
+- **Append-only by convention.** The module has no `UPDATE` or `DELETE`
+  code - only `INSERT` (Lab 5) and `SELECT` (Lab 6). Nothing enforces
+  that at the database level yet; the guarantee is "this code cannot
+  rewrite history", which is what makes the log usable as evidence.
+- **`AUTOINCREMENT` side effect.** SQLite creates an internal
+  `sqlite_sequence` table to remember the last id handed out. It is not
+  one of "our" tables; the idempotency test filters out `sqlite_%` names.
+- **New terms:**
+  - **Relational database** - data in tables of rows and typed columns,
+    queried with SQL.
+  - **SQLite** - a serverless relational database that is just one file
+    on disk; no process to run, no network.
+  - **Schema** - the definition of a table: its columns, types, and
+    constraints.
+  - **`AUTOINCREMENT` primary key** - a column the database fills with an
+    ever-increasing unique integer.
+  - **`NOT NULL` constraint** - a column that must always have a value;
+    the database rejects a row that omits it.
+  - **Idempotent** - running it again has no further effect
+    (`CREATE TABLE IF NOT EXISTS`).
+  - **Append-only log** - rows are only inserted, never changed or
+    removed.
+- **Input / processing / output / security boundary.** Input: a
+  filesystem path (pytest's `tmp_path` in the tests). Processing: make
+  the parent dir, connect, execute the schema. Output: a SQLite file on
+  disk holding an empty `workflow_events` table; `initialize()` returns
+  nothing. Security boundary: local file I/O only - no network, no model
+  call, no secret, no git. No `.db` file is created inside the repo (the
+  tests use `tmp_path`). `scanner.py` stays the sole risk authority - the
+  audit table records what happened, it never scores or decides.
+- **Verification.** `python -m pytest -q tests/test_workflow.py
+  tests/test_audit_db.py` → `57 passed` (48 workflow, unchanged; 9 new
+  in `test_audit_db.py`: file creation, parent-dir creation, string
+  path, idempotency, exact columns and types, `id` is the integer
+  primary key, the five recording columns are `NOT NULL`, the schema
+  uses `IF NOT EXISTS`, and the ordering proof - three inserts sharing
+  one timestamp come back in insert order). Full suite → `444 passed`
+  (`435 + 9`). `python scripts/run_release_gate.py` still ends `RELEASE
+  GATE PASS for AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** An audit trail is only trustworthy if its
+  order is trustworthy. Basing the sequence on a database-assigned
+  monotonic id, rather than on wall-clock timestamps, removes the one
+  thing that most often corrupts an event log - clock skew and ties -
+  and gives every later Day 5 lab (the writes, the ordered reads, the
+  state-skip tests) a solid foundation.
+- **Follow-up flagged.** `.gitignore` covers `*.jsonl` (the v2 log) but
+  not `*.db` or `data/`. No database file is created in the repo now,
+  but once `v4_service.py` uses a real `DB_PATH` (Day 5 Lab 5+ / Day 9),
+  `data/` or `*.db` should be added to `.gitignore`.
+- **What this lab did not do.** No `record_event()` (Lab 5), no
+  `list_events()` (Lab 6), no `v4_service.py` wiring, no `.gitignore`
+  edit, no edit to `docs/v4_architecture.md`. No git commit, tag, or
+  push.
+
+## Day 5, Lab 5 — Implement database initialization and event writes
+
+- **The idea.** Lab 4 built an empty table; this lab adds
+  `audit_db.record_event()`, the function that puts a row in it. Every
+  time the workflow does something - moves to `SCANNED`, gets `APPROVED`,
+  fails a check - the code calls `record_event()` with which workflow,
+  what happened, the resulting state, and a data payload. That row is
+  written to the SQLite file and never changed, so after a workflow runs
+  there is a permanent, in-order record of every step: durable evidence.
+- **`record_event(path, workflow_id, event_type, state, payload)`.**
+  - `initialize(path)` first - so it works even on a path with no
+    database yet.
+  - one `INSERT` using `?` placeholders - the values are handed to SQLite
+    as data and are never parsed as SQL, so a payload string like
+    `"'; DROP TABLE ..."` is stored literally, not executed.
+  - `created_at = datetime.now(timezone.utc).isoformat()` - stamped
+    inside the function from the machine's UTC clock, so a caller cannot
+    supply a fake time.
+  - `payload_json = json.dumps(payload, sort_keys=True)` - the same
+    payload always serialises to the same text.
+  - returns `None`; the row is the effect.
+- **`transition()` is untouched.** It stays a pure guard with no I/O. The
+  "every transition becomes evidence" property is a *convention* the
+  orchestrator follows - `state = transition(state, "SCANNED");
+  record_event(db, wf, "...", state.state, {...})` - not a coupling
+  baked into `transition()`. A test drives the happy path this way and
+  checks the recorded `state` column equals the happy-path list.
+- **Sorted-key JSON vs canonical JSON.** `record_event` uses
+  `json.dumps(payload, sort_keys=True)` - enough for deterministic,
+  readable storage. It is deliberately *not*
+  `proposal_hash.canonical_json` (which also fixes separators and ASCII
+  escapes): that one exists for hashing, where every byte matters; the
+  audit payload only needs to be stable and human-readable.
+- **New terms:**
+  - **Write path** - the code that adds data to a store (versus the read
+    path that queries it).
+  - **`INSERT` statement** - the SQL command that adds one row.
+  - **Parameterised query / bound parameter** - passing values through
+    `?` placeholders so they are treated strictly as data; the standard
+    defence against SQL injection.
+  - **SQL injection** - an attack where attacker-controlled text is
+    executed as SQL; prevented here by the `?` placeholders.
+  - **Server-stamped field** - a value the recording code sets itself
+    (`created_at`) rather than trusting the caller.
+  - **Durable** - survives the process exiting; on disk, not just in
+    memory.
+- **Input / processing / output / security boundary.** Input: a db path
+  plus `workflow_id`, `event_type`, `state`, and a `payload` dict
+  (synthetic in tests). Processing: `initialize()`, then one
+  parameterised `INSERT` with a UTC-stamped time and sorted-key JSON
+  payload. Output: one new append-only row in `workflow_events`; returns
+  nothing. Security boundary: local file I/O only - no network, no model
+  call, no secret, no git. Parameterised SQL and a server-stamped
+  timestamp. `scanner.py` stays the sole risk authority - the audit log
+  records what happened, it never scores or decides.
+- **`.gitignore`.** Added `*.db` (with a comment). `record_event` writes
+  a real database file; the tests keep it in `tmp_path`, but this stops a
+  stray binary DB being committed once `v4_service.py` / the app uses a
+  real path.
+- **Verification.** `python -m pytest -q tests/test_workflow.py
+  tests/test_audit_db.py` → `65 passed` (48 workflow, unchanged; 17 in
+  `test_audit_db.py`: the 9 from Lab 4 plus 8 new - fresh-path creation,
+  exact stored values, UTC ISO `created_at`, nested-payload round trip,
+  key-order-independent storage, append-only in practice, two workflows
+  coexisting, and the transition→event chain over the happy path). Full
+  suite → `452 passed` (`444 + 8`). `python scripts/run_release_gate.py`
+  still ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall
+  -q .` is clean; no `.db` file in the repo.
+- **Why this lab exists.** "We have a workflow" and "we can prove what
+  the workflow did" are different claims. Recording each step as an
+  append-only row - with a trustworthy timestamp and the data behind the
+  decision - is what turns the state machine into an audit trail a
+  compliance reviewer can read months later. Doing it through one small
+  parameterised function keeps the write path safe and the same
+  everywhere.
+- **What this lab did not do.** No `list_events()` (Lab 6), no change to
+  `transition()`, no `v4_service.py` wiring, no `UPDATE`/`DELETE` code,
+  no edit to `docs/v4_architecture.md`. No git commit, tag, or push.
+
+## Day 5, Lab 6 — Implement ordered event retrieval
+
+- **The idea.** Labs 4-5 gave the workflow a way to write its steps down.
+  This lab, `audit_db.list_events(path, workflow_id)`, gives a reviewer a
+  way to read them back. Name one workflow and get a Python list of every
+  event it recorded, **in the exact order it happened**, with each JSON
+  payload turned back into a dict. No SQL, no database tool - the list
+  *is* the story of that workflow.
+- **`list_events(path, workflow_id) -> list[dict]`.**
+  - `initialize(path)` first, so a database that does not exist yet just
+    yields `[]` instead of an error.
+  - one parameterised `SELECT event_type, state, created_at, payload_json
+    FROM workflow_events WHERE workflow_id = ? ORDER BY id` - a
+    **projection** (only the columns needed), filtered to one workflow,
+    sorted by the autoincrement `id`.
+  - returns a list of `{"event_type", "state", "created_at", "payload"}`
+    dicts, with `payload = json.loads(payload_json)` so the caller gets a
+    dict, not a string.
+  - no `id` in the returned dict: the *order of the list* is the id
+    order, which is all a reviewer needs.
+- **Why `ORDER BY id`, not `ORDER BY created_at`.** Same reason as Lab 4:
+  two events can carry the same timestamp, but the database guarantees a
+  strictly increasing `id` per row. Sorting by `id` reproduces insertion
+  order exactly; sorting by the timestamp could reorder same-instant
+  events.
+- **Empty result, not an error.** An unknown `workflow_id` and a missing
+  database file both return `[]`. The caller never has to special-case
+  "not found" - it just gets nothing to iterate.
+- **New terms:**
+  - **Read path / retrieval** - code that queries a store and returns
+    data (versus the write path that adds it).
+  - **`SELECT ... WHERE ... ORDER BY`** - the SQL to fetch chosen rows,
+    filtered and sorted.
+  - **Projection** - selecting only the columns you need, not
+    `SELECT *`.
+  - **Deserialise (`json.loads`)** - turn a stored JSON string back into
+    a Python dict/list.
+  - **Reconstruction** - assembling the ordered event list into a
+    picture of what a workflow did and why.
+- **Input / processing / output / security boundary.** Input: a database
+  path and a `workflow_id` (synthetic in tests). Processing:
+  `initialize()`, then one parameterised filtered-and-sorted `SELECT`,
+  then build dicts with the payload deserialised. Output: a `list[dict]`
+  in event order, or `[]`. Security boundary: local read-only file I/O -
+  no network, no model call, no secret, no git. `list_events` never
+  writes, so it cannot disturb the append-only history. `scanner.py`
+  stays the sole risk authority.
+- **Verification.** The Lab 6 prompt's command is `python
+  evals/run_v4_evals.py`, but that file does not exist yet - it is a
+  Day 8 deliverable (the lab index lists it in the Day 8 file lists, not
+  Day 5 Lab 6's, whose Files are the six named here and whose "Done when"
+  says *pytest*). Running it reports `No such file or directory`, which
+  is the expected state, not a lab failure. `python -m pytest -q
+  tests/test_workflow.py tests/test_audit_db.py` → `72 passed` (48
+  workflow, unchanged; 24 in `test_audit_db.py`: the 17 from Labs 4-5
+  plus 7 new - missing DB → `[]`, unknown id → `[]`, insertion order,
+  the four-key shape with a deserialised nested payload, per-workflow
+  filtering, the full happy-path reconstruction, and order stable across
+  a fresh call). Full suite → `459 passed` (`452 + 7`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean; no `.db` file in
+  the repo.
+- **Why this lab exists.** An audit log that can only be written is half
+  a control. The value shows up when someone asks "what did workflow X
+  actually do, and in what order?" - `list_events` answers that in one
+  call, deterministically, from the durable record. Getting the ordering
+  from a database-assigned key rather than from timestamps is what makes
+  the reconstruction trustworthy.
+- **What this lab did not do.** No `evals/run_v4_evals.py` (Day 8), no
+  change to `transition()` / `record_event()`, no `UPDATE`/`DELETE`, no
+  `v4_service.py` wiring, no edit to `docs/v4_architecture.md`. No git
+  commit, tag, or push.
+
+## Day 5, Lab 7 — Write state-skip and event-order tests
+
+- **The idea.** The state machine and the audit log both work and have
+  spot-check tests. This lab writes the *capstone* negative tests that
+  state the two Day 5 guarantees in full: (1) the control flow cannot
+  jump ahead - *every* step not on the map is rejected, not just the six
+  sampled in Lab 3; (2) the audit log's recorded state sequence is always
+  a legal walk of that same map, in true order.
+- **The state-skip tests (`tests/test_workflow.py`).**
+  - *Exhaustive negative matrix* - loop over every ordered pair of the
+    nine states; for each of the ~70 pairs that is not an arrow in
+    `ALLOWED_TRANSITIONS`, `transition()` raises `ValueError`. This is
+    the complete statement of "only mapped arrows work" - there is no
+    untested pair, so there is no hidden shortcut.
+  - *Only the full path reaches `VERIFIED`* - from each state on
+    `DISCOVERED → SCANNED → PROPOSED → APPROVED → VERIFIED`, the single
+    *non-terminal* next state is the next state on the path; every other
+    allowed target is a drop to `FAILED` / `REJECTED`. So you cannot get
+    to `VERIFIED` without walking through the scan, the proposal, and the
+    human approval.
+  - *Security-critical gates cannot be skipped* - `SCANNED → APPROVED`
+    (skips the proposal), `PROPOSED → VERIFIED` (skips the human),
+    `APPROVED → DRAFT_PR_CREATED` (skips the verifier), and two more,
+    each raise `Invalid transition`.
+  - *Terminal is a dead end* - from `REJECTED`, `FAILED`, or
+    `ROLLED_BACK`, `transition()` to *any* state raises.
+- **The event-order tests (`tests/test_audit_db.py`).**
+  - *The recorded state sequence is always a legal walk* - drive
+    `transition()` through the happy path, a `…PROPOSED → REJECTED` path,
+    and a `… → FAILED` path, recording each step; for every run, every
+    consecutive pair of recorded `state` values is in
+    `ALLOWED_TRANSITIONS`. Because states are only ever recorded *after*
+    a real `transition()`, the log can never show a jump the guard would
+    have refused. This is the crossover test - it checks the log against
+    the state machine.
+  - *The log re-validates against the state machine* - take a recorded
+    happy-path run's `state` list and feed the consecutive pairs back
+    through `transition()`; every call is accepted. The audit trail can
+    be independently replayed.
+  - *Order survives interleaved writes* - record events for two
+    workflows alternately; each workflow's `list_events` is still its own
+    call order.
+  - *A ten-event run keeps call order* - bigger-N reinforcement of the
+    `ORDER BY id` guarantee from Lab 4.
+- **New terms:**
+  - **Negative test** - asserts a bad action fails (raises), not that a
+    good one succeeds.
+  - **Exhaustive / matrix test** - checks every combination in a space,
+    not a sample.
+  - **Capstone test set** - the comprehensive tests written after a
+    feature works, stating the whole guarantee in one place.
+  - **Legal walk** - a state sequence where each consecutive pair is an
+    allowed transition.
+  - **Crossover / integration test** - one test exercising two
+    components together (here the audit log's contents against the state
+    machine's rules).
+  - **Interleaved writes** - events from two workflows recorded
+    alternately; each workflow's own order must still hold.
+  - **Dead end** - a terminal state; `transition()` out of it always
+    raises.
+- **Input / processing / output / security boundary.** Input: the
+  existing `workflow.py` map/guard and `audit_db.py` functions;
+  synthetic workflow ids and states. Processing: call
+  `transition()` / `record_event()` / `list_events()` and assert -
+  raises for illegal moves, ordered lists for the log. Output: test
+  results only; no product behaviour changed. Security boundary: pure,
+  in-memory plus `tmp_path` SQLite - no network, no model call, no
+  secret, no git. `scanner.py` stays the sole risk authority.
+- **Verification.** `python -m pytest -q tests/test_workflow.py
+  tests/test_audit_db.py` → `89 passed` (`test_workflow.py` 48 → 58 with
+  10 new: the exhaustive matrix, the full-path-only-route test, five
+  parametrised gate-skip cases, three terminal-dead-end cases;
+  `test_audit_db.py` 24 → 31 with 7 new: four parametrised legal-walk
+  runs, the replay test, interleaved order, and the ten-event run). Full
+  suite → `476 passed` (`459 + 17`). `python scripts/run_release_gate.py`
+  still ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall
+  -q .` is clean.
+- **Why this lab exists.** "The guard rejects some skips" and "the guard
+  rejects every skip" are different claims, and only the second is a
+  security property. Checking the whole from→to matrix, and checking that
+  the audit log can only ever contain a legal walk, is what lets a
+  reviewer trust that a workflow which *says* it reached `VERIFIED`
+  actually passed through the human approval - there is no code path,
+  tested or untested, that could have jumped it there.
+- **What this lab did not do.** No change to `workflow.py` /
+  `audit_db.py`, no `v4_service.py`, no `evals/run_v4_evals.py`, no edit
+  to `docs/v4_architecture.md`, no Day 5 Summary (that is Lab 8). No git
+  commit, tag, or push.
+
+## Day 5, Lab 8 — Inspect the audit database with Python
+
+- **The idea.** The audit database is one SQLite file. To look inside it
+  you might think you need a tool - the `sqlite3` command-line program,
+  or a GUI like "DB Browser for SQLite". You do not. Everything needed
+  ships with Python: `audit_db.list_events(path, workflow_id)` for one
+  workflow's history, and the standard-library `sqlite3` module for any
+  other question (every workflow id, event counts, filtering by state,
+  the raw stored JSON). "Inspect with Python" means *use the Python you
+  already have*.
+- **No code was added - and why.** The reviewed starter `audit_db.py` is
+  the final state and has exactly four things: `SCHEMA`, `initialize`,
+  `record_event`, `list_events`. No inspector function, no `__main__`, no
+  `scripts/` helper. The current repo file already matches. So this lab
+  is tests plus documentation.
+- **The inspection techniques (all in the new tests).**
+  - `list_events(db, "wf-a")` - one call, the whole ordered history as
+    dicts, no SQL knowledge required.
+  - `SELECT DISTINCT workflow_id FROM workflow_events ORDER BY
+    workflow_id` - every workflow the log knows about.
+  - `SELECT workflow_id, COUNT(*) ... GROUP BY workflow_id` - how many
+    events each workflow has.
+  - `SELECT ... WHERE state = ? ORDER BY id` - every event in a given
+    state, parameterised.
+  - `SELECT payload_json ...` - the payload column is plain JSON text;
+    `json.loads` parses it, or you just read it.
+  - `connection.row_factory = sqlite3.Row` - then `row["state"]` by name
+    instead of `row[1]` by position (ergonomic for ad-hoc looking).
+  - a one-line list comprehension over `list_events()` renders a
+    workflow's history as readable text - no helper function needed to
+    "view rows".
+- **New terms:**
+  - **Standard library** - modules that come with Python (`sqlite3`,
+    `json`); nothing to `pip install`.
+  - **`SELECT DISTINCT`** - return each value once.
+  - **`COUNT(*) ... GROUP BY`** - aggregate: rows per group.
+  - **`row_factory = sqlite3.Row`** - make results support
+    `row["column"]` name access.
+  - **Ad-hoc query** - a one-off `SELECT` you write to answer a specific
+    question, versus a named helper.
+  - **Read-only inspection** - only `SELECT`; never `INSERT` / `UPDATE` /
+    `DELETE`, so looking cannot corrupt the log.
+- **Input / processing / output / security boundary.** Input: the path
+  to a SQLite audit file (`tmp_path` in tests). Processing:
+  `list_events()` for one workflow; stdlib `sqlite3` `SELECT`s for
+  cross-workflow questions; `json.loads` to expand a payload. Output:
+  lists / dicts / counts, and a readable rendering of a workflow's
+  history. Security boundary: local **read-only** file access - no
+  network, no model call, no secret, no git, no writes. `scanner.py`
+  stays the sole risk authority; inspection observes the log, never
+  changes it.
+- **Verification.** `python -m pytest -q tests/test_workflow.py
+  tests/test_audit_db.py` → `96 passed` (`test_workflow.py` unchanged at
+  58; `test_audit_db.py` 31 → 38 with 7 new: `list_events` as the no-SQL
+  read, `DISTINCT` workflow ids, per-workflow counts, filter by state,
+  the raw JSON payload column, `sqlite3.Row` named access, and a
+  readable-lines rendering). Full suite → `483 passed` (`476 + 7`).
+  `python scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** An audit trail is only useful if someone can
+  actually read it during a review or an incident. Storing it in a plain
+  SQLite file, readable with Python's standard library, means no reviewer
+  is blocked waiting for a database tool or an admin - the evidence is
+  self-serve, and because inspection is read-only it cannot disturb the
+  record it is examining.
+- **What this lab did not do.** No code in `audit_db.py` / `workflow.py`,
+  no inspector function, no `__main__`, no `scripts/` file, no
+  `v4_service.py`, no `evals/run_v4_evals.py`, no edit to
+  `docs/v4_architecture.md`. No git commit, tag, or push.
+
+## Day 5 Summary — Labs 1 through 8
+
+1. **Understand workflow states and terminal states** - a remediation is
+   modelled as a state machine; each state records which safety checks
+   have genuinely passed; `REJECTED` / `FAILED` are terminal (fail
+   closed).
+2. **Define the v4 state list and transition map** - `workflow.py`:
+   `STATES` (9) and `ALLOWED_TRANSITIONS` (the allowlist for process
+   movement), plus derived `TERMINAL_STATES`, `START_STATE`, a frozen
+   `WorkflowState`, and `is_terminal()`.
+3. **Implement transition validation** - `transition(current,
+   next_state)`, the single guard: a legal step returns a new
+   `WorkflowState`, anything else raises a `ValueError` that names the
+   states and lists what was allowed.
+4. **Design the SQLite workflow events table** - `audit_db.py`: the
+   `workflow_events` schema (append-only by convention) and
+   `initialize()`; an autoincrement `id`, not the timestamp, carries the
+   order.
+5. **Implement database initialization and event writes** -
+   `record_event()`: `initialize()` first, one parameterised `INSERT`, a
+   server-stamped UTC `created_at`, sorted-key JSON payload. `*.db` added
+   to `.gitignore`.
+6. **Implement ordered event retrieval** - `list_events(path,
+   workflow_id)`: one workflow's whole history in `ORDER BY id` order,
+   payloads deserialised, `[]` for a missing DB or unknown id.
+7. **Write state-skip and event-order tests** - the exhaustive negative
+   matrix (every non-arrow raises), the full-path-only route to
+   `VERIFIED`, terminal dead ends, and the crossover proof that a
+   recorded state sequence is always a legal walk.
+8. **Inspect the audit database with Python** - `list_events()` plus the
+   stdlib `sqlite3` module are the whole toolkit; no separate database
+   application needed; inspection is read-only.
+
+**Where Day 5 leaves off:** the explicit workflow state machine
+(`workflow.py`: `STATES`, `ALLOWED_TRANSITIONS`, `transition`) and the
+SQLite audit log (`audit_db.py`: `initialize`, `record_event`,
+`list_events`) both exist and are exhaustively tested - 58 workflow
+tests, 38 audit tests. `transition()` is a pure guard with no I/O;
+nothing wires it to `record_event()` in product code yet (that
+orchestration is `v4_service.py`, later), and the app does not show the
+log. Everything since the Day 1 baseline commit `517db77` is uncommitted
+on `v4-development`; the suite is at `483 passed`. Day 6 builds the
+verifier: apply an approved proposal to an isolated throwaway copy,
+re-run v1's scanner, and prove the change produced the predicted state
+without increasing the HIGH-risk count - `APPROVED → VERIFIED`.
+
+## Day 6, Lab 1 — Understand verification versus approval
+
+- **The idea.** Two independent checks guard the same remediation, and
+  neither replaces the other. **Approval** is a *human* accepting the
+  **intent** - "yes, requiring human approval for the Billing Agent is
+  the right change, and I am authorised to say so." **Verification** is
+  *software* confirming the change is **correct** - applied to a
+  throwaway copy, does it actually produce the predicted state, touch
+  exactly one agent, change only allowlisted keys, still serialise to
+  valid JSON, and *not* raise the HIGH-risk count? People are good at
+  judging whether a change *should* happen; deterministic code is good
+  at re-deriving whether it *did what it claimed and nothing else*.
+- **Why both, in order.** A human can approve a change that is subtly
+  broken - a typo'd field, an edit that quietly touches a second agent,
+  a "fix" that trades one HIGH finding for a worse one. Software can
+  confirm a change is well-formed but cannot decide whether it is
+  desirable or permitted. v4 runs approval first (`PROPOSED → APPROVED`,
+  a person), then verification (`APPROVED → VERIFIED`, code), and only a
+  proposal that clears both may become a draft PR. This is defence in
+  depth: two controls that fail for different reasons.
+- **The verifier never scores.** It calls v1's `scanner.py` on the
+  *before* environment and on the *candidate* (after) environment and
+  compares the two results - HIGH count, agent count, and so on.
+  `scanner.py` stays the sole risk authority; the verifier only asks
+  "did the scanner's HIGH count go up?" and never overrides a score.
+- **The checks the verifier will run (Day 6 Labs 2-7).**
+  - the change was applied to an **isolated temp copy**, never the source;
+  - exactly **one agent** matched the proposal's target;
+  - only **allowlisted top-level keys** are present after the change;
+  - the candidate still **serialises** to valid JSON and reads back
+    equal;
+  - the **HIGH-risk count did not increase** (a remediation must not
+    make things worse);
+  - (later) the predicted post-change score was actually reached.
+  A proposal advances only if *every* check passes - fail closed.
+- **Scanner-integration decision (recorded for Day 6 Lab 2).** The
+  reviewed starter `verifier.py` assumes a v4-rewritten `scanner.py`
+  with a dict API. This repo's `scanner.py` is the untouched v1 API
+  (`scan_environment(path) -> list[ScanResult]`, ~15 consumers, pinned
+  v1 evidence). Chosen approach: the verifier uses the **v1 scanner
+  unchanged** - write the candidate's agent list to a temp JSON file,
+  call `scan_environment(temp_path)`, count `risk_level == "HIGH"`. No
+  `scanner.py` change; the temp-file scan doubles as the Day 6 Lab 2
+  "isolated verification directory".
+- **New terms:**
+  - **Verification** - an automated, deterministic check that an applied
+    change matches its prediction and breaks no invariant.
+  - **Intent vs correctness** - *what* a change is meant to achieve (the
+    human's call) vs *whether it actually does that and only that* (the
+    software's call).
+  - **Isolated / candidate environment** - a throwaway copy the proposed
+    change is applied to, so the real inventory is never touched while
+    checking.
+  - **Re-scan / before-and-after** - running the scanner on the original
+    and the candidate to compare risk counts.
+  - **Regression check** - confirming a fix did not make something else
+    worse (here: the HIGH count must not go up).
+  - **Defence in depth** - layering independent controls so one missing
+    the problem does not let it through.
+- **Input / processing / output / security boundary.** Input: the
+  concept, the reviewed starter `verifier.py`, and v1's `scanner.py`.
+  Processing: understanding only - no code, no computation. Output: this
+  learning-log entry. Security boundary: pure documentation - no code
+  path, no network, no model call, no secret, no git. `scanner.py` stays
+  the sole risk authority.
+- **Verification.** No behaviour changed. `python -m pytest -q
+  tests/test_verifier.py tests/test_approval.py` reports `file or
+  directory not found: tests/test_verifier.py` - that file is Day 6
+  Lab 2+, so its absence now is expected, not a failure.
+  `tests/test_approval.py` alone is still `40 passed`; the full suite is
+  still `483 passed`; `python scripts/run_release_gate.py` still ends
+  `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .` is
+  clean.
+- **Why this lab exists.** Letting a human approval stand in for a
+  correctness check - or a passing verification stand in for human
+  authorisation - is exactly how an automated system ships a change
+  nobody actually vetted end to end. Separating the two, and requiring
+  both, is what lets a reviewer sign off on *intent* quickly while the
+  machine independently proves the *mechanics*.
+- **What this lab did not do.** No `verifier.py`, no `scanner.py` change,
+  no `VerificationResult`, no temp-dir logic, no test files (all Day 6
+  Lab 2+). No git commit, tag, or push.
+
+## Day 6, Lab 2 — Create an isolated temporary verification directory
+
+- **The idea.** The verifier checks a proposed change *before* it is
+  real. If it checked by editing the actual agent inventory, a failed or
+  half-finished check would leave the real data broken. So the first
+  thing `verifier.py` gets is an **isolation primitive**:
+  `isolated_environment_file(environment)` - a context manager that
+  deep-copies the environment, writes it to a JSON file in a fresh
+  system temporary directory, hands back the path for later checks, and
+  deletes the whole directory when the `with` block ends.
+- **Two layers protect the source.**
+  1. `copy.deepcopy(environment)` - the file is written from a full
+     independent copy, so nothing the verifier does can mutate the
+     caller's dict (tested: the source object, and its nested `agents`
+     list, are identical before and after).
+  2. `tempfile.TemporaryDirectory(prefix="agentguard-verify-")` - the
+     copy lives under the OS temp area (`/var/folders/...` on this
+     machine), never in the repo and never where the real environment is
+     stored (tested: no file anywhere under the repo root is created).
+- **Cleanup is guaranteed.** `TemporaryDirectory` is a context manager:
+  it removes the directory and everything in it on exit, whether the
+  block finishes normally or raises. A test raises `RuntimeError` inside
+  the block and confirms the directory is still gone afterward. Nothing
+  is left on disk to leak or to be committed.
+- **Why a context manager (`@contextmanager` + `yield`).** Setup runs
+  before `yield` (make the copy, make the dir, write the file), the
+  caller uses the yielded path, then cleanup runs after `yield`
+  automatically. Lab 3 will apply the proposal to a candidate; Lab 4
+  will scan the candidate file with v1's `scan_environment(path)`; both
+  run *inside* this `with` block, so they inherit the isolation for
+  free.
+- **Deviation from the starter, and why.** The reviewed starter does the
+  temp-directory dance inline inside `verify()`. This lab factors it into
+  a named, separately tested helper because the lab's whole scope *is*
+  the isolation step; Lab 7's `verify()` will call the helper.
+- **New terms:**
+  - **Isolation** - doing work on a copy in a separate location so the
+    original is never at risk.
+  - **Temporary directory** - a scratch folder the OS provides, outside
+    your project, meant to be short-lived.
+  - **`tempfile.TemporaryDirectory`** - Python's context manager that
+    creates such a folder and recursively deletes it on exit.
+  - **Context manager / `with` block** - a construct that runs setup on
+    entry and guaranteed cleanup on exit, even if the body raises.
+  - **`@contextmanager` / `yield`** - a decorator that turns a generator
+    into a context manager; code before `yield` is setup, code after is
+    cleanup.
+  - **Deep copy** - a fully independent copy including all nested
+    containers (`copy.deepcopy`).
+  - **Candidate** - the proposed post-change state being checked, versus
+    the source.
+- **Input / processing / output / security boundary.** Input: an
+  `environment` dict (synthetic in tests). Processing: `deepcopy`, make a
+  temp dir, write `json.dumps(snapshot, indent=2)` to `candidate.json`,
+  `yield` the path, auto-delete the dir. Output: a `Path` valid only
+  inside the `with` block; nothing persists afterward. Security boundary:
+  scratch-area filesystem only - no network, no model call, no secret,
+  no git, and no write under the repo or to the source object.
+  `scanner.py` unchanged and still the sole risk authority.
+- **Verification.** `python -m pytest -q tests/test_verifier.py` → `8
+  passed` (candidate file round-trips to the environment; temp dir is
+  outside the repo; `agentguard-verify-` prefix; directory deleted on a
+  normal exit and on an exception; source dict and nested list untouched;
+  editing the re-read copy does not change the source; no repo file
+  created). Full suite → `491 passed` (`483 + 8`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** Verification that mutates the thing it is
+  verifying is not verification - a check that fails halfway has already
+  done damage. Doing every check on a deep copy in a throwaway directory
+  means the worst a broken candidate can do is fail the check; the real
+  inventory, and the repo, are never in the blast radius.
+- **What this lab did not do.** No `apply_proposal_to_environment` call
+  (Lab 3), no scanning (Lab 4), no structural / key checks (Labs 5-6),
+  no `VerificationResult` (Lab 7), no `scanner.py` change, no
+  `v4_service.py`. No git commit, tag, or push.
+
+## Day 6, Lab 3 — Apply the proposal only to the isolated candidate
+
+- **The idea.** Lab 2's helper isolated a copy of the *source*. This lab
+  makes that copy the **candidate** - the environment as it would look
+  with the approved change applied - so later labs can scan and check the
+  "after" picture. The candidate is produced by
+  `apply_proposal_to_environment(environment, proposal)` (Day 3 Lab 7):
+  it deep-copies the environment, finds the one agent the proposal
+  targets, applies the proposal's small `field_changes` to that agent in
+  the copy, and returns the copy. The real inventory never moves - this
+  is a "what-if", not a "do it".
+- **The helper, renamed and extended.**
+  `isolated_environment_file(environment)` → `isolated_candidate_file(environment, proposal)`.
+  It now: (1) `candidate = apply_proposal_to_environment(environment,
+  proposal)` - the one place the proposal is ever applied; (2) writes the
+  *candidate* (not the source) to `candidate.json` in a fresh temp
+  directory; (3) yields `(candidate, candidate_path)` so Lab 4 has both
+  the dict and the file; (4) deletes the directory on exit.
+- **Fail before side effects.** `apply_proposal_to_environment` requires
+  the proposal to name **exactly one** agent - zero means the wrong
+  environment (or a renamed agent), more than one is ambiguous - and
+  raises `ValueError` otherwise. That check runs *before* the temp
+  directory is created, so a bad proposal leaves nothing on disk. A test
+  confirms no `agentguard-verify-*` directory is left behind on that
+  error.
+- **Two independent guarantees, both tested.**
+  - *Source untouched* - after the block, `ENV` is deep-equal to a
+    pre-snapshot, the target agent's flag is still `False`, and
+    `ENV["agents"]` is the same object (no copy-back).
+  - *Surgical change* - the non-target agent is byte-identical between
+    source and candidate; the target agent differs only in the single
+    proposed field (`human_approval_required`).
+- **The `import copy` went away.** Lab 2's helper did its own
+  `copy.deepcopy`; now the deep copy lives inside
+  `apply_proposal_to_environment`, so `verifier.py` no longer imports
+  `copy`.
+- **New terms:**
+  - **Candidate state** - the hypothetical post-change environment, built
+    for checking, never committed anywhere.
+  - **"What-if" / dry evaluation** - computing the result of a change
+    without performing it.
+  - **`apply_proposal_to_environment`** - the pure function that produces
+    candidate state: deep-copy, apply to exactly one agent, return.
+  - **Exactly-one-match rule** - the proposal's target must be present
+    precisely once; zero or many is an error, not a guess.
+  - **Bounded change** - the proposal only ever writes its small
+    allowlisted `field_changes`.
+  - **Fail before side effects** - the match check runs before any temp
+    directory is made, so a bad proposal leaves nothing behind.
+- **Input / processing / output / security boundary.** Input: an
+  `environment` dict and a `RemediationProposal` (synthetic in tests).
+  Processing: deep-copy + apply to produce the candidate; write it to a
+  temp file; yield `(candidate, path)`; auto-delete the directory.
+  Output: the candidate dict and a `Path` to its isolated file, valid
+  only inside the `with` block. Security boundary: scratch filesystem
+  only - no network, no model call, no secret, no git; the proposal is
+  applied to a deep copy only, and the source dict and every non-target
+  agent are untouched. `scanner.py` unchanged and still the sole risk
+  authority.
+- **Verification.** `python -m pytest -q tests/test_verifier.py` → `9
+  passed` (5 isolation assertions from Lab 2, adapted to the new
+  signature; 4 new for Lab 3: candidate has the change and round-trips
+  through the file, source environment untouched, only the target agent
+  changed, a no-match proposal raises `exactly one agent` and leaves no
+  temp directory). Full suite → `492 passed` (`491 + 1` net - the Lab 2
+  file went 8 → 9). `python scripts/run_release_gate.py` still ends
+  `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .` is
+  clean.
+- **Why this lab exists.** To test a change safely you need its result
+  without its risk. Producing the candidate as a deep copy - and applying
+  the proposal there and nowhere else - means the verifier can scan and
+  poke the "after" state freely, while the real (synthetic) inventory is
+  guaranteed to be exactly where it was. The exactly-one-match rule also
+  turns "this proposal is for a different environment" into a clean early
+  error rather than a silent partial apply.
+- **What this lab did not do.** No scanning / re-scan (Lab 4), no
+  structural / serialisation / key checks (Labs 5-6), no
+  `VerificationResult` (Lab 7), no `scanner.py` change, no
+  `v4_service.py`. No git commit, tag, or push.
+
+## Day 6, Lab 4 — Rescan before and after risk results
+
+- **The idea.** A remediation is only "verified" if it provably made
+  things better - or at least no worse - by the *same deterministic
+  yardstick* that flagged the problem. So the verifier runs v1's scanner
+  twice: **before** on the current environment, **after** on the
+  candidate (Lab 3's copy with the proposal applied), then compares the
+  number of agents rated `HIGH`. The rule: `after_high_count <=
+  before_high_count`. A "fix" that removes one HIGH finding but adds a
+  worse one, or a bad edit that breaks a second agent, pushes the after
+  count up and fails verification.
+- **The verifier never scores.** `scanner.py` decides risk; the verifier
+  only asks "did the scanner's HIGH count go up?" It reads the scanner's
+  verdict, never overrides it.
+- **Adapting to the v1 scanner (Day 6 Lab 1 decision).** v1's
+  `scan_environment(path)` reads a **bare JSON list of agents** from a
+  file (`load_agents` requires all six fields: `agent_name`, `owner`,
+  `identity`, `tools`, `sensitive_data_access`,
+  `human_approval_required`) and returns `ScanResult` objects with a
+  `.risk_level`. So `scan_high_count(environment)` writes
+  `environment["agents"]` (the list, not the whole dict) to a throwaway
+  temp file, calls `scan_environment(path)`, and counts `risk_level ==
+  "HIGH"`. `scanner.py` itself is untouched.
+- **Two functions.**
+  - `scan_high_count(environment) -> int` - the temp-file-plus-v1-scanner
+    HIGH count for one environment.
+  - `rescan_before_and_after(environment, candidate) -> dict` -
+    `{"before_high_count", "after_high_count", "high_count_did_not_increase"}`.
+- **Worked example (the tests).** The source's first agent has a
+  destructive tool (`delete_customer_record`), sensitive-data access, and
+  no approval → v1 rules AG-002 and AG-003 fire → `HIGH`. So
+  `scan_high_count(ENV) == 1`. Applying `REQUIRE_HUMAN_APPROVAL` sets
+  `human_approval_required: True`, which clears AG-002/003, dropping that
+  agent to `LOW`. So `scan_high_count(candidate) == 0` and
+  `high_count_did_not_increase` is `True`. A separate test feeds a
+  hand-built "after" with an extra HIGH agent and confirms the check
+  returns `False`.
+- **New terms:**
+  - **Re-scan / before-and-after comparison** - running the same
+    analyser on the original and the proposed result and diffing the
+    outputs.
+  - **HIGH-risk count** - how many agents the deterministic scanner rates
+    `HIGH`; the number that must not rise.
+  - **Regression** - a change that makes a previously-fine thing worse;
+    here, a new or additional HIGH agent.
+  - **Monotonic-improvement constraint** - the only allowed direction is
+    "same or fewer HIGH", never "more".
+  - **Deterministic yardstick** - the scanner: same input → same
+    findings, no model, no randomness, so before/after are comparable.
+- **Input / processing / output / security boundary.** Input: the
+  `environment` dict and the `candidate` dict (from Lab 3). Processing:
+  for each, write its `agents` list to a temp file, run v1
+  `scan_environment(path)`, count `HIGH`; return the two counts and the
+  pass boolean. Output: a small dict. Security boundary: scratch
+  filesystem only - no network, no model call, no secret, no git.
+  `scanner.py` unchanged and still the sole risk authority. A malformed
+  candidate makes `scan_environment` raise (a missing required field);
+  Lab 5 wraps that as a failed check rather than a crash.
+- **Verification.** `python -m pytest -q tests/test_verifier.py` → `15
+  passed` (the 9 from Labs 2-3 - with `identity` added to the test
+  `ENV` agents so v1's `load_agents` accepts them - plus 6 new: source
+  has one HIGH agent, remediated candidate has zero, `rescan_before_and_after`
+  reports `{1, 0, True}`, a change that adds a HIGH agent fails the
+  check, a neutral change passes, and `scan_high_count` leaves no temp
+  directory). Full suite → `498 passed` (`492 + 6`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** "A human approved it" and "the AI proposed it"
+  are not evidence that a change actually reduces risk. Re-running the
+  deterministic scanner on the exact candidate state, and refusing any
+  result where the HIGH count went up, is what makes "this remediation
+  improves security" a measured fact rather than a hope - and it catches
+  the subtle case where a fix for one agent quietly makes another one
+  worse.
+- **What this lab did not do.** No structural / serialisation checks
+  (Lab 5), no target-count / allowlisted-key checks (Lab 6), no
+  `VerificationResult` (Lab 7), no predicted-score check, no `scanner.py`
+  change, no `v4_service.py`. No git commit, tag, or push.
+
+## Day 6, Lab 5 — Add structural and serialization checks
+
+- **The idea.** Lab 4's re-scan assumes the candidate is well-formed. If
+  it is not - an agent missing a field, `agents` that is not a list, a
+  candidate that is not even a dict - v1's `load_agents` raises and the
+  verifier crashes instead of reporting a problem. This lab adds
+  `structural_checks(candidate)`, which runs *first* and turns malformed
+  candidate data into a clean **failed check** (`passed: False`), never
+  an exception.
+- **The four checks (each a `{"name", "passed"}` row).**
+  - *candidate is a JSON object* - it is a `dict`, not a list / string /
+    None / number.
+  - *candidate serialises and re-reads unchanged* -
+    `json.loads(json.dumps(candidate)) == candidate`, wrapped in
+    `try/except (TypeError, ValueError)`. This catches two things: a
+    value JSON cannot represent (a `set`, a custom object → `dumps`
+    raises → caught → `False`), and a **lossy** round-trip (an integer
+    dict key comes back as the string `"2"`, so it will not compare
+    equal).
+  - *candidate has an agents list* - `candidate["agents"]` exists and is
+    a `list`.
+  - *every agent record is complete* - every entry is a `dict` carrying
+    all six of `scanner.REQUIRED_FIELDS`. Reusing the scanner's own
+    constant means "well-formed" is defined as exactly "the scanner can
+    load it".
+- **Never raises, by construction.** Every check is computed
+  defensively: the object check gates the `.get("agents")` call, the
+  list check gates the per-agent loop, the round-trip is in a
+  `try/except`. A test throws every kind of bad candidate at it
+  (`[]`, `None`, `"x"`, `42`, missing `agents`, `agents` as a dict, an
+  agent missing `identity`, a string in `agents`, a `set` value, an int
+  key) and none produce an exception.
+- **The row shape is deliberate.** `{"name": str, "passed": bool}` is the
+  same shape the re-scan check (Lab 4) and the target/key checks (Lab 6)
+  use, so Lab 7's `verify()` can concatenate every function's rows into
+  one list and the `VerificationResult` passes only if *all* of them
+  passed.
+- **New terms:**
+  - **Structural check** - verifying the *shape* of data (types,
+    required keys, nesting), independent of its values.
+  - **Serialization / deserialization** - converting an object to text
+    (JSON) and back.
+  - **Round-trip test** - serialise then deserialise and confirm you got
+    back exactly the input.
+  - **Schema / required fields** - the agreed set of keys a record must
+    have (`scanner.REQUIRED_FIELDS`).
+  - **Fail-safe check** - written so bad input yields `False`, never a
+    raised exception.
+  - **Lossy serialization** - a round-trip that silently changes the
+    data (non-string dict keys coerced to strings).
+- **Input / processing / output / security boundary.** Input: a
+  candidate - expected to be an environment dict, but the function
+  accepts any object. Processing: four independent, non-raising checks.
+  Output: a list of four `{"name", "passed"}` rows. Security boundary:
+  pure, in-memory - no network, no model call, no secret, no git, no
+  filesystem. `scanner.py` unchanged and still the sole risk authority;
+  this only asks whether a candidate is *loadable*, not what its risk is.
+- **Verification.** `python -m pytest -q tests/test_verifier.py` → `26
+  passed` (the 15 from Labs 2-4 plus 11 new: a well-formed candidate
+  passes all four rows and the rows have the right shape; a
+  parametrised set of non-objects fail the object check without raising;
+  a missing `agents` key and a non-list `agents` fail the list check; an
+  agent missing `identity` and a non-dict agent entry fail the
+  completeness check; a `set` value and an integer key each fail the
+  round-trip check without raising). Full suite → `509 passed` (`498 +
+  11`). `python scripts/run_release_gate.py` still ends `RELEASE GATE
+  PASS for AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** A verifier that crashes on bad input fails
+  *open* in the worst way - it produces no verdict, and a caller that
+  does not handle the exception might treat "no error yet" as "fine".
+  Checking the candidate's shape first, with checks that cannot
+  themselves throw, means every candidate gets a definite pass-or-fail
+  answer, and a malformed one is rejected with a specific reason instead
+  of a stack trace.
+- **What this lab did not do.** No target-count / allowlisted-key checks
+  (Lab 6), no `VerificationResult` and no gating of the scan on these
+  checks (Lab 7), no `scanner.py` change, no `v4_service.py`. No git
+  commit, tag, or push.
+
+## Day 6, Lab 6 — Add target count and allowlisted key checks
+
+- **The idea.** Lab 5 confirmed the candidate is *well-formed*; this lab
+  confirms the change was *surgical* - the proposal touched exactly one
+  intended agent and nothing else. `target_and_key_checks(environment,
+  candidate, proposal)` returns four `{"name", "passed"}` rows:
+  - **agent count unchanged** - `len(candidate agents) == len(source
+    agents)`; a remediation must not add or drop agents.
+  - **only allowlisted top-level keys** - `set(candidate) -
+    ALLOWED_ENVIRONMENT_KEYS` is empty, where the allowlist is
+    `{"environment_name", "source_system", "agents"}`; a change must not
+    inject new top-level structure.
+  - **proposal targets exactly one agent** - exactly one agent in the
+    candidate carries `proposal.agent_name` (not zero - wrong
+    environment or renamed - not two - ambiguous).
+  - **only the target agent changed** - comparing candidate agents to
+    source agents by name, exactly one differs and it is the target.
+    This single check also catches an **added** agent (its name is not in
+    the source, so it counts as "changed") and a **no-op** (nothing
+    differs, so `changed == []`).
+- **Trust-nothing verification.** `apply_proposal_to_environment` already
+  enforces the exactly-one-match rule when it *builds* the candidate.
+  This lab re-checks it independently, on the candidate, because a
+  verifier must not assume the code that produced the candidate was
+  honest or bug-free - the whole point of verification is that it holds
+  even if the producer is wrong.
+- **How "only the target changed" is computed.** Build a
+  `{agent_name: agent}` map of the source, then walk the candidate's
+  agents and collect the names of any whose dict is not equal to the
+  same-named source agent (or to `None`, if the name is new). The row
+  passes only if that list is exactly `[proposal.agent_name]`.
+- **Never raises.** Every check is guarded: `source_agents` and
+  `candidate_agents` fall back to `[]` when the input is not a dict, the
+  key check uses a sentinel for a non-dict candidate, and each per-agent
+  step checks `isinstance(agent, dict)` first. A malformed candidate
+  produces `passed: False` rows, not an exception (Lab 5's structural
+  checks catch the malformation itself).
+- **New terms:**
+  - **Target** - the single object a change is meant to affect
+    (`proposal.agent_name`).
+  - **Blast radius** - everything a change actually touched; verification
+    insists it equals just the target.
+  - **Allowlisted keys** - the closed set of top-level keys an
+    environment may have; anything else is rejected.
+  - **Surgical / minimal change** - a change that alters exactly what it
+    claims and nothing adjacent.
+  - **Independent re-check / trust-nothing verification** - re-proving a
+    property the producer already claimed, on the output, without relying
+    on the producer.
+  - **Diff-based check** - comparing before and after to see precisely
+    what moved.
+  - **No-op detection** - noticing the change did nothing, which is also
+    a failure.
+- **Input / processing / output / security boundary.** Input: the source
+  `environment`, the `candidate`, and the `proposal` (for the target
+  name) - synthetic in tests. Processing: four independent, non-raising
+  comparisons (lengths, key-set difference, target-name count, per-name
+  diff). Output: a list of four `{"name", "passed"}` rows. Security
+  boundary: pure, in-memory - no network, no model call, no secret, no
+  git, no filesystem, no scan. `scanner.py` unchanged and still the sole
+  risk authority; this checks *scope*, not risk.
+- **Verification.** `python -m pytest -q tests/test_verifier.py` → `34
+  passed` (the 26 from Labs 2-5 plus 8 new: a surgical candidate passes
+  all four rows with the right shape; an added agent fails the count and
+  only-target rows; a removed agent fails the count row; an extra
+  top-level key fails the allowlist row; modifying a non-target agent
+  fails only-target; the target name appearing twice fails the
+  target-count row; renaming the target fails both the target-count and
+  only-target rows; a no-op candidate fails only-target). Full suite →
+  `517 passed` (`509 + 8`). `python scripts/run_release_gate.py` still
+  ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .`
+  is clean.
+- **Why this lab exists.** An AI-proposed change that says "I only edited
+  the Billing Agent" could, through a bug or a manipulated proposal,
+  actually have added an agent, renamed one, or slipped an extra
+  top-level field into the config. Independently diffing the candidate
+  against the source and refusing anything but a single, named, expected
+  change is what makes "this change is surgical" a checked fact rather
+  than a claim - and it does so without trusting the component that built
+  the candidate.
+- **What this lab did not do.** No `VerificationResult` and no
+  assembly/gating of all the check rows into one pass/fail (Lab 7), no
+  `scanner.py` change, no predicted-score check, no `v4_service.py`. No
+  git commit, tag, or push.
+
+## Day 6, Lab 7 — Create a detailed VerificationResult
+
+- **The idea.** Labs 2-6 built the verifier's individual checks; this lab
+  assembles them into one function, `verify(environment, proposal)`, that
+  returns a single **`VerificationResult`** - the evidence. "Detailed"
+  means it is not a bare boolean: it carries the verdict (`passed`), the
+  full per-check breakdown (`checks` - a tuple of `{"name", "passed"}`
+  rows), the concrete numbers (`before_high_count`, `after_high_count`),
+  and the `candidate_environment`.
+- **Two uses, which is the learning goal.**
+  - *audited* - `to_dict()` returns a plain dict, JSON-serialisable,
+    ready to be the payload of an `audit_db` `workflow_events` row.
+  - *displayed* - `summary()` renders a human checklist:
+    `Verification PASSED (10/10 checks)` followed by `  [x] agent count
+    unchanged` / `  [ ] high-risk count did not increase` per row. A UI
+    can render `checks` directly. (`summary()` is a small addition over
+    the reviewed starter, which stops at `passed` / `checks` /
+    `candidate_environment`; it makes the "displayed" half concrete.)
+- **`verify()` composes the pieces, and gates.**
+  1. `with isolated_candidate_file(environment, proposal) as (candidate,
+     candidate_path):` - the proposal is applied once, to a deep copy, in
+     a throwaway temp directory (keeps the Lab 2/3 isolation in the
+     product path, not just the tests).
+  2. `structural_checks(candidate)` - the four "is it well-formed" rows.
+  3. a real filesystem round-trip row -
+     `json.loads(candidate_path.read_text()) == candidate`.
+  4. **only if every check so far passed** - re-scan
+     (`rescan_before_and_after`), add the `high-risk count did not
+     increase` row, and run `target_and_key_checks`. This **gate** means
+     a malformed candidate produces a failed result with a named failing
+     row, never a crash from feeding bad data to v1's scanner.
+  5. `passed = all(row["passed"] for row in checks)` - one failing row
+     fails the whole verification.
+- **Ten check rows on the happy path:** the four structural, isolated
+  write/reread, high-risk count, and the four target/key rows.
+- **Frozen.** `@dataclass(frozen=True)`; `checks` is a `tuple`, not a
+  list. Once produced, the result cannot be edited - it stands as a
+  record, like `ApprovalRecord`.
+- **Failure paths a real `verify()` can show (tested).** The three
+  allowlisted templates cannot make things worse, so the failure tests
+  hand-build a `RemediationProposal` directly (its `__post_init__` only
+  checks the template id is allowlisted and `field_changes` is a
+  non-empty dict, not that the values match the template):
+  - a **no-op** proposal (`{"human_approval_required": False}` on an
+    agent already `False`) → candidate equals the source → `only the
+    target agent changed` is `False` → `passed is False`.
+  - a **dangerous** proposal (adds a `delete_` tool + sensitive-data
+    access to a currently-low agent) → that agent becomes `HIGH` →
+    `high-risk count did not increase` is `False`,
+    `after_high_count > before_high_count`, `passed is False`.
+- **New terms:**
+  - **VerificationResult** - a frozen record of one verification: verdict
+    plus evidence.
+  - **Check row** - one `{"name": str, "passed": bool}` entry; the atomic
+    unit of evidence.
+  - **Aggregate verdict** - `passed = all(rows passed)`; one failure
+    fails the whole.
+  - **`to_dict()` / serialisable evidence** - the audit form for the
+    event log.
+  - **`summary()` / rendered evidence** - the display form, a readable
+    checklist.
+  - **Gating** - running an expensive or fragile step (the scan) only
+    after cheaper preconditions (the structural checks) pass.
+- **Input / processing / output / security boundary.** Input: an
+  `environment` dict and a `RemediationProposal` (synthetic in tests).
+  Processing: isolate → structural checks → filesystem round-trip →
+  (if well-formed) re-scan + target/key checks → aggregate → build the
+  frozen result. Output: a `VerificationResult`; `to_dict()` /
+  `summary()` derive from it. Security boundary: scratch filesystem +
+  in-memory only - no network, no model call, no secret, no git; the
+  proposal is applied to a deep copy in a temp directory and the source
+  is never touched. `scanner.py` unchanged and still the sole risk
+  authority - `verify()` only reads and compares its outputs.
+- **Verification.** `python -m pytest -q tests/test_verifier.py` → `42
+  passed` (the 34 from Labs 2-6 plus 8 new: a good proposal passes all
+  ten named rows; the before/after HIGH counts are `1` / `0`; the result
+  carries the candidate; the result is frozen; `to_dict()` has the five
+  keys and is JSON-serialisable; `summary()` shows `PASSED` and every
+  name; a no-op proposal fails on `only the target agent changed`; a
+  dangerous proposal fails on `high-risk count did not increase`). Full
+  suite → `525 passed` (`517 + 8`). `python scripts/run_release_gate.py`
+  still ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall
+  -q .` is clean.
+- **Why this lab exists.** A verification that returns only "true" or
+  "false" is nearly useless when it fails - an operator cannot tell
+  *why*, and an auditor has nothing to point at. Packaging the verdict
+  with the full per-check list, the concrete risk numbers, and both a
+  machine form (`to_dict`) and a human form (`summary`) turns
+  verification from an opaque gate into reviewable, storable evidence -
+  which is exactly what `VERIFIED` needs to mean something in an audit.
+- **What this lab did not do.** No predicted-score check, no
+  `v4_service.py` wiring (that composes approval + verify + audit,
+  later), no `scanner.py` / `workflow.py` change. Day 6 Lab 8 writes the
+  exhaustive positive + failure test set. No git commit, tag, or push.
+
+## Day 6, Lab 8 — Write verifier positive and failure tests
+
+- **The idea.** Day 6's capstone test lab. The one guarantee `verify()`
+  makes is `result.passed == all(row["passed"] for row in
+  result.checks)` - the verdict is exactly the logical AND of every
+  check, so a **single failing row blocks the whole verification**, no
+  matter how many others passed. This lab writes the systematic positive
+  + failure set that proves that, proves the structural-check **gate**,
+  and proves a failed result still carries complete evidence.
+- **What the new tests establish.**
+  - *Anchor positive* - a clean proposal passes all ten check rows and
+    `passed is True`, with `before/after_high_count == 1/0`.
+  - *`passed` is the AND of the rows* - parametrised over a good, a
+    no-op, and a dangerous proposal: `result.passed == all(c["passed"]
+    for c in result.checks)` every time.
+  - *One failure is enough* - the no-op proposal fails exactly one row
+    (`only the target agent changed`) and `passed is False`.
+  - *Extra top-level key* - `verify({**ENV, "note": "..."}, proposal)`:
+    the stray key rides through the deep copy, `only allowlisted
+    top-level keys` fails, `passed is False`.
+  - *Rename via field_changes* - a hand-built proposal with
+    `field_changes={"agent_name": "Renamed"}` renames the target so its
+    old name matches zero agents in the candidate; `proposal targets
+    exactly one agent` fails.
+  - *The gate* - `field_changes={5: "leaked int key"}` puts a non-string
+    key on the agent; JSON coerces it to `"5"` so the round-trip is not
+    equal. A structural check fails, so `verify()` **never runs the
+    scan**: `before_high_count` and `after_high_count` stay `None`, there
+    is no `high-risk count did not increase` row, and `result.checks` has
+    at most five rows. Bad data is never handed to v1's scanner.
+  - *Evidence on failure* - a failed result still lists the failing check
+    names, `summary()` shows `FAILED` and a `[ ]` line, and
+    `to_dict()` still serialises for the audit log.
+  - *Isolation holds on the failure path* - after `verify(ENV,
+    dangerous)`, `ENV` is deep-equal to a pre-snapshot and
+    `ENV["agents"]` is the same object.
+- **What `verify()` cannot fail through the real path.** Because
+  `apply_proposal_to_environment` only `.update()`s one agent, several
+  rows (`candidate is a JSON object`, `agent count unchanged`, `every
+  agent record is complete`) can only fail at the unit level - those are
+  covered by the Lab 5-6 tests that call `structural_checks` /
+  `target_and_key_checks` directly. Non-JSON *values* in `field_changes`
+  (a `set`, a custom object) would make `verify()` raise rather than fail
+  a check, but that is an **upstream Day 3 invariant** - `build_proposal`
+  only ever puts approved, JSON-native values in `field_changes` - not
+  something `verify()` is asked to defend against.
+- **New terms:**
+  - **Conjunctive gate** - passes only if *all* sub-checks pass
+    (`all(...)`); the opposite of "any one is enough".
+  - **Fail closed** - a failed or unclear check means "do not proceed".
+  - **Short-circuit gating** - skipping later, fragile steps (the scan)
+    once an earlier precondition has already failed.
+  - **Positive test / negative (failure) test** - proving the good path
+    works vs proving each bad path is caught.
+  - **Reachable failure** - a failure you can trigger through the real
+    API, versus only at the unit level.
+  - **Evidence completeness** - a failed result carries enough detail
+    (named failing checks, summary, serialisable form) to act on and to
+    audit.
+- **Input / processing / output / security boundary.** Input: synthetic
+  environments and proposals, some hand-built to force a specific
+  failure. Processing: call `verify(...)` and assert on `passed`,
+  `checks`, the HIGH counts, `summary()`, `to_dict()`. Output: test
+  results only; no product behaviour changed. Security boundary: scratch
+  filesystem + in-memory (via `verify()`) - no network, no model call,
+  no secret, no git. `scanner.py` unchanged and still the sole risk
+  authority.
+- **Verification.** `python -m pytest -q tests/test_verifier.py` → `52
+  passed` (the 42 from Labs 2-7 plus 10 new). Full suite → `535 passed`
+  (`525 + 10`). `python scripts/run_release_gate.py` still ends `RELEASE
+  GATE PASS for AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** "Verification ran" is not the same as
+  "verification passed", and "one check failed" must mean the whole
+  proposal is stopped - not "mostly fine". Testing that `passed` is
+  exactly the AND of every row, that a malformed candidate is refused
+  before it can crash the scanner, and that a failure still produces a
+  named, storable reason is what lets a downstream caller safely treat
+  `result.passed is False` as a hard stop.
+- **What this lab did not do.** No `verifier.py` / `scanner.py` /
+  `workflow.py` change, no `v4_service.py` wiring, no predicted-score
+  check. No git commit, tag, or push.
+
+## Day 6 Summary — Labs 1 through 8
+
+1. **Understand verification versus approval** - a human approves
+   *intent*, software checks *correctness*; v4 requires both, in order,
+   and the verifier only compares two of `scanner.py`'s outputs.
+2. **Create an isolated temporary verification directory** -
+   `isolated_environment_file` (later `isolated_candidate_file`):
+   deep-copy + a `tempfile.TemporaryDirectory` that self-deletes, so the
+   real inventory and the repo are never in the blast radius.
+3. **Apply the proposal only to the isolated candidate** -
+   `apply_proposal_to_environment` produces the candidate as a deep copy;
+   the proposal is applied in exactly one place, to a throwaway; a
+   no-match proposal raises before any temp dir is made.
+4. **Rescan before and after risk results** - `scan_high_count` writes
+   the agent list to a temp file and runs v1's unchanged
+   `scan_environment(path)`; `rescan_before_and_after` refuses any result
+   where the HIGH count went up.
+5. **Add structural and serialization checks** - `structural_checks`:
+   is a JSON object, round-trips through JSON unchanged, has an `agents`
+   list, every agent has `scanner.REQUIRED_FIELDS`; never raises.
+6. **Add target count and allowlisted key checks** -
+   `target_and_key_checks`: agent count unchanged, only the three
+   allowlisted top-level keys, exactly one agent named for the target,
+   and exactly that one agent changed - re-checked independently of the
+   code that built the candidate.
+7. **Create a detailed VerificationResult** - `verify()` composes the
+   pieces (gating the scan on the structural checks) into a frozen
+   `VerificationResult`: `passed` + the per-check `checks` tuple + the
+   HIGH counts + the candidate; `to_dict()` for audit, `summary()` for
+   display.
+8. **Write verifier positive and failure tests** - proved `passed` is
+   exactly the AND of every check row, that a malformed candidate is
+   gated out before the scan, and that a failed verification still names
+   its failing checks.
+
+**Where Day 6 leaves off:** the verifier is complete and exhaustively
+tested - `verifier.py` (`isolated_candidate_file`, `scan_high_count`,
+`rescan_before_and_after`, `structural_checks`, `target_and_key_checks`,
+`verify` → `VerificationResult`), 52 tests. v1's `scanner.py` is
+unchanged; the verifier reaches it through a temp file (the Day 6 Lab 1
+decision). Nothing wires `verify()` into an orchestrator or the app yet -
+`v4_service.py` (which will chain approval → verify → audit → GitHub) is
+still to come, and there is no predicted-score check. Everything since the
+Day 1 baseline commit `517db77` is uncommitted on `v4-development`; the
+suite is at `535 passed`. Day 7 builds the GitHub layer: turn a verified
+proposal into a **draft** pull request on the separate private synthetic
+demo repo, dry-run by default, with the repo, branch prefix, and file
+path all on an allowlist - `VERIFIED → DRAFT_PR_CREATED`.
+
+## Day 7, Lab 1 — Define repository, branch, and file-path allowlists
+
+- **The idea.** Day 7 will run `git` and `gh` commands whose arguments
+  are a repo name, a branch name, and a file path. If any argument were
+  malformed or just wrong, the result could be **command injection** (a
+  value like `owner/repo; rm -rf ~` treated as commands) or a
+  **wrong-target change** (a push to `main`, an edit to a production
+  file, a PR on the real AgentGuard repo). This lab defines the
+  **allowlist** - plain configuration for *where* a machine-proposed
+  change may go - and the three validators that enforce it before any
+  command is built.
+- **Two layers, two jobs.**
+  - *Shape checks* (regex) - `SAFE_REPO = ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`
+    and `SAFE_BRANCH = ^agentguard/[a-z0-9-]{1,60}$`. A value containing a
+    space, `;`, `&&`, `$(...)`, a backtick, a newline, or a second `/`
+    fails the pattern, so it can never reach a `git`/`gh` argument. This
+    is the **command-injection** guard.
+  - *Value checks* (exact membership) -
+    `ALLOWLISTED_REPOSITORIES = frozenset({"justintinlei/agentguard-remediation-demo"})`,
+    `ALLOWLISTED_FILE_PATHS = frozenset({"connected_environment/agents.json"})`,
+    and the `agentguard/` branch prefix. The change can only land in the
+    one synthetic repo, on an `agentguard/` branch (never `main`), in the
+    one synthetic file. This is the **wrong-target** guard.
+- **The three validators.** `require_allowlisted_repository(repo)`
+  (shape then value, distinct messages: "not OWNER/REPO shaped" vs "not
+  allowlisted"), `require_allowlisted_branch(branch)` (`SAFE_BRANCH`),
+  `require_allowlisted_file_path(path)` (exact membership). Each returns
+  the value on success and raises `ValueError` otherwise - including on a
+  non-string input, which raises `ValueError`, not `TypeError`, so a
+  caller only has to catch one thing.
+- **Exact match beats a shape check for the file path.** There is no
+  regex for "a safe path"; there is one allowed string. `..`, a leading
+  `/`, `.github/workflows/deploy.yml`, and even a trailing space are
+  simply not `"connected_environment/agents.json"`, so they are refused
+  with no clever parsing.
+- **Configuration, not a secret.** `justintinlei/agentguard-remediation-demo`
+  is now in `github_plan.py` on purpose. A GitHub `owner/repo` grants no
+  access - it says *where*, not *who* - so it is safe to commit, exactly
+  like the value already recorded in `docs/v4_github_demo_setup.md`. The
+  GitHub token is the secret; `gh` keeps it in the OS keyring, and
+  `check_no_secrets.py` scans only token shapes.
+- **Decision vs the reviewed starter.** The starter's `github_plan.py`
+  only *shape*-checks the repository inside `create_plan` (its test uses
+  `"owner/repo"`). This repo's `docs/v4_github_demo_setup.md` commits to
+  a **specific** allowlisted repo, and Day 7 Lab 7 is titled "Block
+  Unapproved **Repositories** Paths And Branch Names", so this lab
+  enforces both shape and exact value. The course `tests/test_github_plan.py`
+  uses the real demo-repo string.
+- **New terms:**
+  - **Allowlist** - a closed list of what is permitted; everything else
+    denied by default (the opposite of a blocklist, which always misses
+    a case).
+  - **Command injection** - data supplied to a program being interpreted
+    as commands or arguments it should not be.
+  - **Shape / syntactic validation** - checking a value's *form* (a
+    regex) before trusting it.
+  - **Value / semantic validation** - checking a value is one of a
+    specific known-good set.
+  - **Configuration vs. secret** - configuration says *where* (safe to
+    commit, grants no access); a secret says *who you are* (never
+    committed).
+  - **Wrong-target change** - a correct-looking operation aimed at the
+    wrong repo, branch, or file.
+- **Input / processing / output / security boundary.** Input: a
+  candidate `repository` / `branch` / `file_path` string (synthetic in
+  tests). Processing: shape regex → exact-membership check → return or
+  raise `ValueError`. Output: the validated string, or a `ValueError`.
+  Security boundary: pure string / regex validation - no network, no
+  `git`, no `gh`, no `subprocess`, no filesystem. `scanner.py` unchanged
+  and still the sole risk authority. No secret added.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `48 passed` (the 9 branch-rule / PR-template tests from Day 2 Lab 6
+  plus the new allowlist section, expanded by parametrisation:
+  demo repo / branch / file accepted; well-shaped-but-unlisted repos →
+  "not allowlisted"; shell-metacharacter and mis-shaped repos → "OWNER/REPO";
+  `main` and non-`agentguard/` branches rejected; `README.md` /
+  `../../etc/passwd` / `.github/...` rejected; non-strings → `ValueError`;
+  the constants are frozensets with the expected members). Full suite →
+  `570 passed` (up from `535`; `tests/test_github_plan.py` alone goes
+  from 13 collected to 48). `python scripts/run_release_gate.py` still
+  ends `RELEASE GATE PASS for AgentGuard v4` (`SECRET CHECK PASS`
+  included); `python -m compileall -q .` is clean.
+- **Why this lab exists.** The moment a machine can run `gh` / `git`, the
+  arguments to those commands are the attack surface. Defining *up front*
+  - as committed configuration - the one repo, the one branch shape, and
+  the one file that a remediation may touch, and refusing everything else
+  with a shape check *and* an exact-value check, is what makes "the
+  workflow cannot push to the wrong place or inject a command" a checked
+  property rather than a hope.
+- **What this lab did not do.** No `GitHubPlan` dataclass (Lab 2), no
+  `create_plan()` / `execute_plan()` (Labs 2-6), no command lists, no
+  `subprocess`, no `gh` / `git` call, no network. No git commit, tag, or
+  push.
+
+## Day 7, Lab 2 — Create the GitHubPlan data contract
+
+- **The idea.** The dangerous way to automate GitHub is a function that
+  immediately runs `subprocess.run(["git", "push", ...])` - you never get
+  to see what it is about to do. v4 instead builds a **plan object**
+  first: a frozen `GitHubPlan` listing every command it *would* run, as
+  data. A human, and the dry-run executor (Lab 5), read the exact
+  commands before deciding to execute. This lab is the container type;
+  Lab 3-4 fill in the commands.
+- **A data contract, not just a struct.** `GitHubPlan` has five fields -
+  `repository`, `branch`, `file_path`, `title`, `commands` - and its
+  `__post_init__` validates every one against the Day 7 Lab 1 allowlist
+  (`require_allowlisted_repository/branch/file_path`), requires a
+  non-empty `title`, and checks `commands`. So an **invalid `GitHubPlan`
+  cannot be constructed** - the same self-validating pattern as
+  `RemediationProposal` and `ApprovalRecord`.
+- **`commands` are token-lists, never shell strings.** Each command is a
+  list like `["git", "add", "connected_environment/agents.json"]`, not
+  the string `"git add ..."`. `__post_init__` rejects a bare string, an
+  empty command, an empty token, and a non-string token, then normalises
+  everything to a **tuple of tuples** - immutable, and a defensive copy
+  so a caller mutating the list they passed in cannot change the plan
+  afterward. Token-lists are the reason there is no shell-injection
+  surface: `subprocess` with a list never invokes a shell, so no token is
+  ever re-parsed for `;`, `&&`, `$(...)`, etc.
+- **`to_dict()`** - `asdict(self)`, the plain-dict form for the audit log
+  and the UI. `commands` come out as nested tuples, which JSON serialises
+  as nested arrays.
+- **Deviations from the reviewed starter (noted).** The starter's
+  `GitHubPlan` has no validation - it validates inside `create_plan`.
+  This lab moves the validation onto the dataclass so the *type itself*
+  is the guarantee. And `commands` is a tuple of tuples rather than
+  `list[list[str]]`, to make the frozen record genuinely immutable.
+- **New terms:**
+  - **Data contract** - a type with a fixed, validated shape that callers
+    and reviewers can rely on.
+  - **Plan / plan-then-execute** - build an inspectable description of the
+    work first; run it as a separate, explicit step.
+  - **Frozen dataclass** - immutable after construction; stands as a
+    reviewed record.
+  - **`__post_init__` validation** - the dataclass checks its own fields
+    on creation and raises `ValueError` on anything invalid.
+  - **Token list (argv)** - a command as a list of separate strings,
+    passed to `subprocess` with no shell, so nothing is re-parsed for
+    metacharacters.
+  - **Defensive copy** - copying an input (here into a tuple) so a
+    caller mutating their copy cannot change the plan.
+- **Input / processing / output / security boundary.** Input:
+  `repository` / `branch` / `file_path` / `title` strings and an optional
+  `commands` sequence (synthetic in tests). Processing: `__post_init__`
+  runs the Lab 1 validators, checks `title`, normalises and validates
+  `commands`. Output: a frozen `GitHubPlan`; `to_dict()` for audit /
+  display. Security boundary: pure - no network, no `git`, no `gh`, no
+  `subprocess`, no filesystem. `scanner.py` unchanged and still the sole
+  risk authority. No secret added.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `65 passed` (the 48 from Day 2 Lab 6 + Day 7 Lab 1, plus the new
+  contract section, expanded by parametrisation: a valid plan holds its
+  fields and starts with no commands; a `commands=[[...],[...]]` input is
+  normalised to a tuple of tuples; `to_dict()` has the five keys and is
+  JSON-serialisable; the plan is frozen; mutating the passed-in list does
+  not change it; an off-allowlist repo / `main` branch / off-allowlist
+  file / blank or non-string title makes the plan unconstructable; a
+  bare-string command, an empty command, an empty token, a non-string
+  token, and a non-sequence command each raise). Full suite → `587
+  passed` (up from `570`). `python scripts/run_release_gate.py` still
+  ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .`
+  is clean.
+- **Why this lab exists.** "Automate GitHub" and "let a program run `gh`
+  whenever it wants" are very different. Turning the intended commands
+  into a frozen, self-validating, serialisable object - reviewable before
+  a single one runs - is what makes the GitHub step auditable and gives
+  the dry-run default (Lab 5) something concrete to print. It also puts
+  the allowlist check where it cannot be skipped: you cannot even hold a
+  `GitHubPlan` for the wrong repo.
+- **What this lab did not do.** No `create_plan()` (Lab 3), no
+  `execute_plan()` (Lab 5), no command building, no `subprocess`, no
+  `gh` / `git` call, no network. No git commit, tag, or push.
+
+## Day 7, Lab 3 — Build safe branch and commit commands
+
+- **The idea.** Lab 2 gave `GitHubPlan` an empty `commands` field; this
+  lab adds `create_plan()`, which fills it with the four `git` steps that
+  put a remediation on its own branch and keep it *off* `main`:
+  `checkout -b agentguard/<id>`, `add <the one allowlisted file>`,
+  `commit -m <title>`, `push -u origin <that branch>`.
+- **The four commands, and why each is safe.**
+  - `git checkout -b agentguard/<id>` - a **new branch** off the current
+    HEAD. The remediation exists only here. `branch_name()` (Day 2 Lab 6)
+    produces the name, lowercased, and rejects an unsafe workflow id, so
+    the branch can never be `main`.
+  - `git add connected_environment/agents.json` - stages **exactly the
+    one allowlisted file**. Never `git add .` or `git add -A`, which
+    would sweep in whatever else is in the working tree. The path comes
+    straight from the argument and is validated by
+    `GitHubPlan.__post_init__`.
+  - `git commit -m "<title>"` - commits on the feature branch.
+  - `git push -u origin agentguard/<id>` - pushes **that branch** to the
+    remote (`-u` sets upstream tracking). There is no `git push origin
+    main`.
+- **What is deliberately absent.** No `git merge`, no `git checkout
+  main`, no `--force`, no `git reset`. The plan is structurally
+  incapable of moving `main`; the only thing that ever does is a human
+  merging the draft PR.
+- **Reuse over re-derivation.** `create_plan` calls `branch_name(workflow_id)`
+  and `pr_title(workflow_id)` from Day 2 Lab 6 rather than re-formatting
+  the branch and title inline, and it hands the finished values to
+  `GitHubPlan(...)`, whose `__post_init__` (Lab 2) does the repo /
+  file-path / command validation. The result is a six-line function
+  where every line is either "get a validated value" or "list a
+  command".
+- **New terms:**
+  - **Branch** - an independent line of commits; one does not affect
+    another until merged.
+  - **`main` / trunk** - the branch everyone depends on; the thing being
+    protected.
+  - **Feature / topic branch** - a short-lived branch for one change
+    (`agentguard/<id>`).
+  - **Isolation** - the change is contained, so it can be reviewed,
+    tested, or discarded without affecting `main`.
+  - **Staging (`git add`)** - choosing which changes go into the next
+    commit; naming the exact file scopes the blast radius.
+  - **Upstream (`-u`)** - links a local branch to a remote branch for
+    future push / pull.
+  - **No apply step** - the absence of `merge` is the control:
+    application is a human action on GitHub, not a plan step.
+- **Input / processing / output / security boundary.** Input:
+  `repository`, `workflow_id`, optional `file_path` (synthetic in tests).
+  Processing: `branch_name(workflow_id)` (validates), `pr_title(...)`,
+  build four `git` token-lists, construct `GitHubPlan` (validates repo +
+  file path + commands). Output: a frozen `GitHubPlan` with four `git`
+  commands, or a `ValueError`. Security boundary: pure - no network, no
+  `git`, no `gh`, no `subprocess`, no filesystem. Nothing runs.
+  `scanner.py` unchanged and still the sole risk authority. No secret
+  added.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `79 passed` (the 65 from Day 2 Lab 6 + Day 7 Labs 1-2, plus 14 new:
+  `create_plan` fills the fields from the id; the `commands` are exactly
+  the four `git` tuples in order; every first token is `git` (no `gh`
+  yet); `git add` stages only the one file, never `.` / `-A`; no command
+  contains `main` / `master` / `merge` / `--force` / `-f` / `reset` /
+  `origin main`; the branch appears only in `checkout` and `push`; the
+  id is lowercased into the branch; unsafe ids and an off-allowlist repo
+  or file path each raise `ValueError`). Full suite → `601 passed` (up
+  from `587`). `python scripts/run_release_gate.py` still ends `RELEASE
+  GATE PASS for AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** The safest place for a machine-proposed change
+  is a branch nobody depends on. Building the plan so its git commands
+  create a fresh `agentguard/` branch, stage exactly one file, and push
+  only that branch - with no `merge` anywhere - means a bug or a bad
+  proposal can, at worst, produce an unwanted draft PR. It cannot rewrite
+  `main`, and it cannot stage files it was never meant to touch.
+- **What this lab did not do.** No `gh pr create --draft` command
+  (Lab 4), no `execute_plan()` (Lab 5-6), no `subprocess`, no `gh` /
+  `git` call, no network. No git commit, tag, or push.
+
+## Day 7, Lab 4 — Build the draft pull request command
+
+- **The idea.** Lab 3 built the four `git` commands that get the change
+  onto its own branch. This lab adds the fifth - the one that opens the
+  pull request: `gh pr create --draft --repo <repo> --title <title>
+  --body-file .agentguard/pr_body.md`. The point is the `--draft` flag.
+- **What `--draft` guarantees.** A **draft** PR shows a "Draft" label,
+  still runs CI and can collect reviews, but its **merge button is
+  disabled** - it cannot be merged until a human clicks "Ready for
+  review". So a machine-created PR *begins in review state*: it is a
+  proposal, and turning it into a mergeable change is a deliberate human
+  action (mark ready), then merging is a second one (click merge).
+- **The rest of the command, and what is absent.** `--repo <repository>`
+  names the target unambiguously (not inferred from the local checkout);
+  `--title` is the fixed `pr_title()` string; `--body-file` reads the
+  description from `.agentguard/pr_body.md`. There is **no** `--base`
+  (the base defaults to the repo's `main` - the PR *proposes* a merge
+  into `main` but, being a draft, cannot perform one), **no** `--auto`
+  (which would enable auto-merge), and **no** `-w` / `--web` / `--fill`.
+- **The body.** The description content is what `render_pr_body()` (Day 2
+  Lab 6) produces - labelled review fields plus the fixed
+  draft / no-merge / synthetic footer. It is written to
+  `.agentguard/pr_body.md` just before live execution; `create_plan()`
+  does not write it, and because that path is never `git add`ed, the
+  body file never lands in the demo repo's history. The write step is
+  not wired into any executor yet.
+- **Two Lab 3 tests updated.** `create_plan().commands` is now five
+  entries, so the "exactly four git commands" test became "four git
+  commands then the draft PR command", and "every command is git" became
+  "the first four are git and the last is `gh pr create`". Lab 3's
+  "no command can touch `main`" assertions still hold with the `gh`
+  command present (regression-checked).
+- **New terms:**
+  - **Draft PR** - a pull request explicitly marked not-ready; cannot be
+    merged until un-drafted.
+  - **Review state** - the phase where a change is visible and
+    inspectable but not applied.
+  - **"Ready for review"** - the button that takes a PR out of draft; a
+    required human step.
+  - **`--repo OWNER/REPO`** - tells `gh` exactly which repository to
+    create the PR in.
+  - **`--body-file`** - read the PR description from a file rather than
+    an inline string.
+  - **Base branch** - the branch a PR proposes to merge *into*; defaults
+    to `main`.
+  - **`--auto` (deliberately absent)** - the flag that would enable
+    auto-merge.
+- **Input / processing / output / security boundary.** Input: the same
+  `repository` / `workflow_id` / `file_path` `create_plan` already takes.
+  Processing: append one `gh` token-list to the plan's `commands`.
+  Output: a `GitHubPlan` whose `commands` now has five entries (four
+  `git` + one `gh`). Security boundary: pure - no network, no `gh`, no
+  `git`, no `subprocess`, no filesystem. Nothing runs. `scanner.py`
+  unchanged and still the sole risk authority. No secret added.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `85 passed` (79 → 85: two Lab 3 tests updated for five commands, plus
+  six new: the last command is exactly the draft-PR tuple; `--draft`
+  appears before `--repo`; `--repo` / `--title` / `--body-file` carry
+  the expected values; the command has no `--auto` / `merge` / `-w` /
+  `--web` / `--fill`; `.agentguard/pr_body.md` is never staged by
+  `git add`; the five-command plan still cannot touch `main`). Full
+  suite → `607 passed` (up from `601`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** The last command in an automated GitHub flow
+  is the one that could turn a proposal into an applied change. Making it
+  `gh pr create --draft` - with no `--auto`, no `--base` override, and no
+  `merge` anywhere in the plan - means the machine's output is a PR that
+  is *structurally unable to merge itself*. Application requires a human
+  to take it out of draft and click merge, which is exactly the review
+  gate v4's whole model depends on.
+- **What this lab did not do.** No `execute_plan()` (Lab 5-6), no
+  body-file write step, no `subprocess`, no `gh` / `git` call, no
+  network. No git commit, tag, or push.
+
+## Day 7, Lab 5 — Implement dry-run execution as the default
+
+- **The idea.** Labs 3-4 built a `GitHubPlan` holding five exact
+  commands. This lab adds `execute_plan(plan)` - the function that "runs"
+  a plan - and the key design choice is that **by default it runs
+  nothing**. Called with no flag it returns one row per command,
+  `{"command": [...tokens...], "status": "DRY_RUN"}`, so a person reads
+  every `git` / `gh` call that *would* execute: no branch, no push, no
+  PR, no file written, no network call.
+- **The safe default.** `execute_plan(plan)` and `execute_plan(plan,
+  live=False)` are identical - dry-run. Real execution is
+  `execute_plan(plan, live=True)`, which is a **separate, explicit
+  opt-in** built in Lab 6; until then that branch raises
+  `NotImplementedError`. The dangerous behaviour is never what you get by
+  accident.
+- **Idempotent inspection.** A dry run has no side effects, so you can
+  call it any number of times and the world is unchanged. A test proves
+  this the strict way: it monkeypatches `subprocess.run` to raise on any
+  call, then runs `execute_plan(plan)` and gets the full DRY_RUN list -
+  the function never touches `subprocess` (it does not even import it
+  yet).
+- **The output is the review surface.** The returned list of
+  `{"command", "status"}` dicts is plain data - JSON-serialisable, one
+  entry per command, in order - so the Day 9 app, an eval, or a person
+  at a REPL can render it as a checklist of exactly what execution would
+  do. The `gh pr create --draft` command is just another `DRY_RUN` row;
+  nothing is special-cased.
+- **New terms:**
+  - **Dry run** - executing a plan in "show me, don't do it" mode: the
+    exact operations and their order, but nothing changes.
+  - **Safe default** - the behaviour you get without asking for anything
+    special is the harmless one; the dangerous one requires an explicit
+    request.
+  - **`DRY_RUN` status** - the label saying "this command was listed,
+    not executed".
+  - **Opt-in** - a capability that is off unless the caller deliberately
+    turns it on.
+  - **Side effect** - a change outside the function (a file, a network
+    call, a git ref); the dry run has none.
+- **Input / processing / output / security boundary.** Input: a
+  `GitHubPlan` and an optional `live` flag (default `False`). Processing:
+  `live=False` → map each command to `{"command": list(command),
+  "status": "DRY_RUN"}`; `live=True` → raise `NotImplementedError`.
+  Output: a JSON-serialisable list of dicts. Security boundary: pure - no
+  `subprocess`, no network, no `git`, no `gh`, no filesystem. The default
+  path has no boundary to cross because it does nothing. `scanner.py`
+  unchanged and still the sole risk authority. No secret added.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `92 passed` (85 → 92: seven new - `execute_plan` defaults to dry-run
+  and lists every command; `live=False` equals the default; nothing is
+  marked `EXECUTED`; the result is JSON-serialisable; a monkeypatched
+  `subprocess.run` that raises is never called; `live=True` raises
+  `NotImplementedError`; the draft-PR command is just another `DRY_RUN`
+  entry). Full suite → `614 passed` (up from `607`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean.
+- **Why this lab exists.** When a program can run `gh` and `git`, the
+  gap between "generate a plan" and "carry it out" is where a mistake
+  becomes an outage. Making `execute_plan` inspect-only unless the caller
+  explicitly passes `live=True` means the ordinary path - the one a
+  developer hits while wiring things up, the one an eval exercises, the
+  one the app shows by default - cannot change GitHub. You have to mean
+  it.
+- **What this lab did not do.** No live execution / `subprocess`
+  (Lab 6), no opt-in mechanism beyond the raising `live` branch (Lab 6),
+  no `gh` / `git` call, no network, no body-file write. No git commit,
+  tag, or push.
+
+## Day 7, Lab 6 — Add explicit opt-in live execution
+
+- **The idea.** Lab 5 left `execute_plan(plan, live=True)` raising. This
+  lab builds it: the loop that actually runs the five commands. The point
+  is **separating action authority from plan generation** -
+  `create_plan()` *describes* a change and has no power to act; the one
+  and only place a real `git` / `gh` command runs is `execute_plan(plan,
+  live=True)`, and reaching it takes a deliberate, named flag.
+- **The live loop.** `for command in plan.commands: subprocess.run(list(command),
+  check=True, text=True, capture_output=True)` → append `{"command":
+  [...], "status": "EXECUTED", "stdout": ...}`.
+  - **Token list, no `shell=True`.** The command goes straight to the OS
+    as a list; there is no shell to interpret `;`, `&&`, `$(...)`.
+  - **`check=True` = fail fast.** A non-zero exit raises
+    `CalledProcessError` and the loop stops - it never runs `git push`
+    after `git commit` failed.
+  - **stdout captured**, not dumped to the terminal.
+- **`live` is keyword-only.** `def execute_plan(plan, *, live=False)`, so
+  `execute_plan(plan, True)` is a `TypeError`. You cannot turn on live
+  execution by fat-fingering a positional argument - you have to write
+  `live=True`. (Deviation from the starter, which has `live` as
+  positional-or-keyword.)
+- **Incident and cleanup (recorded honestly).** On the first test run, a
+  leftover Lab 5 test - `test_live_execution_is_not_yet_available`, which
+  asserted `execute_plan(live=True)` raises `NotImplementedError` and did
+  **not** monkeypatch `subprocess` - now hit the real loop and ran `git
+  checkout -b agentguard/wf-9f2a1c` and `git add
+  connected_environment/agents.json` in this repo before `git commit`
+  failed (`check=True`) and stopped the run. Impact: a transient local
+  branch only - **no commit** (reflog confirms), **no push**, **no PR**,
+  and `connected_environment/agents.json` unchanged (`git add` on an
+  unmodified tracked file is a no-op; nothing was staged). Cleanup:
+  `git checkout v4-development`, `git branch -D agentguard/wf-9f2a1c`;
+  verified `git branch` is back to `main` + `v4-development`, the index
+  is empty, and the working tree matches the pre-lab state. The stale
+  test was deleted. **Lesson:** every test that exercises `live=True`
+  must monkeypatch `subprocess.run` first; a test written against a
+  "not yet implemented" stub becomes dangerous the moment the stub is
+  filled in.
+- **New terms:**
+  - **Action authority** - the privilege to cause a real outside-world
+    change; deliberately concentrated in one function.
+  - **Separation of generation and execution** - building the
+    description and carrying it out are distinct steps with distinct
+    risk.
+  - **Opt-in flag** - off unless explicitly set; here also keyword-only,
+    so it must be named.
+  - **`subprocess.run(args, ...)` with a list** - run a program with no
+    shell involved.
+  - **`shell=True` (never used)** - would run a command string through a
+    shell, re-enabling injection.
+  - **`check=True` / fail-fast** - abort on the first failure instead of
+    continuing.
+  - **`CalledProcessError`** - the exception `check=True` raises on a
+    non-zero exit.
+- **Input / processing / output / security boundary.** Input: a
+  `GitHubPlan` and `live` (keyword-only, default `False`). Processing:
+  `live=False` → the Lab 5 DRY_RUN list; `live=True` → run each command
+  via `subprocess` (list form, no shell, `check=True`), collect
+  `EXECUTED` rows. Output: a list of dicts, or a propagated
+  `CalledProcessError`. Security boundary: this lab *adds* the real
+  boundary - `live=True` is the only path that touches `git` / `gh` /
+  the network. `create_plan()` and the default `execute_plan()` stay
+  pure. Every test monkeypatches `subprocess.run`, so `pytest` runs no
+  real command. `scanner.py` unchanged and still the sole risk
+  authority. No secret added.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `97 passed` (92 → 97: the stale `..._not_yet_available` test removed,
+  six new added - live-true marks every command `EXECUTED` with captured
+  stdout; `subprocess.run` called once per command in order with
+  `list(command)`; the call kwargs have `check=True` /
+  `capture_output=True` and no `shell`; `live` is keyword-only
+  (`execute_plan(plan, True)` → `TypeError`); a failure on command 2
+  propagates and command 3 never runs; with `subprocess.run` set to
+  raise on any call, `create_plan` and the default `execute_plan` still
+  succeed). Full suite → `619 passed`. `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean;
+  `git branch` shows only `main` and `v4-development`.
+- **Why this lab exists.** Concentrating every real `git` / `gh` call in
+  one keyword-only opt-in means the parts that *decide* what to do
+  (`create_plan`, the verifier, the workflow) never carry the privilege
+  to *do* it. A bug in plan generation can produce a wrong plan; it
+  cannot execute one. And a caller cannot slide into live mode by
+  accident - `live=True` has to be typed.
+- **What this lab did not do.** No real `git` / `gh` / network call in
+  the tests, no `v4_service.py` wiring, no PR body write step, no
+  confirmation token beyond the keyword-only `live=True`. Day 7 Lab 7
+  adds the "block unapproved" enforcement + test matrix. No git commit,
+  tag, or push.
+
+## Day 7, Lab 7 — Block unapproved repositories, paths, and branch names
+
+- **The idea.** Every string that becomes an argument to `git` or `gh` -
+  a repo name, a branch, a file path, a title - is a place where a wrong
+  or hostile value could do damage: a push to the AgentGuard source repo,
+  a branch that clobbers `main`, an edit to `.github/workflows/`, or a
+  shell-metacharacter payload. The **command boundary** is the last point
+  where that data is still just data. This lab makes `create_plan`
+  validate *every* input at that boundary, before it builds a single
+  command token.
+- **The one code change.** `create_plan` already ran `branch_name()`
+  (which validates the branch and, transitively, the workflow id).
+  Lab 7 adds the two that were left implicit:
+  `require_allowlisted_repository(repository)` and
+  `require_allowlisted_file_path(file_path)` as the first two lines. Now
+  the boundary function itself is the gate - not `GitHubPlan.__post_init__`
+  downstream. `__post_init__` still re-checks all three (defence in
+  depth), so the *type* also cannot hold an unapproved value.
+- **What is refused (each raises `ValueError`, nothing is built).**
+  - *wrong repository* - any `OWNER/REPO` but the one demo repo,
+    including `justintinlei/agentguard-v4` (the AgentGuard **source**
+    repo) and a `…-demos` near-miss typo.
+  - *unsafe repo shape* - `owner/repo; rm -rf ~`, `owner/$(id)`,
+    `owner/repo && x`, a newline, backticks, no `/`, `a/b/c`.
+  - *wrong / unsafe branch* - `main`, `master`, `feature/x`,
+    `agentguard/UPPER`, `agentguard/wf/nested`, an over-length id.
+  - *wrong / unsafe file path* - `README.md`,
+    `.github/workflows/deploy.yml`, `/etc/passwd`, `../../secrets`, a
+    `…/../../x` suffix, a case or trailing-space variant.
+- **Transitive validation, and one accepted edge case.** `branch_name`
+  builds `agentguard/<id>` and checks it against
+  `^agentguard/[a-z0-9-]{1,60}$`. That means the raw `workflow_id` can
+  only contain `[a-zA-Z0-9-]` - so no metacharacter can survive into the
+  `git commit -m <title>` or `gh --title <title>` argument either, even
+  though the title uses the raw id. A `workflow_id` of `"main"` is
+  *accepted*: it yields the branch `agentguard/main`, which is prefixed
+  and can never be the real `main`.
+- **The boundary holds (proved).** After `create_plan(DEMO_REPO, WF)`,
+  every token in every one of the five commands is either a fixed literal
+  (`git`, `gh`, `--draft`, `--repo`, …) or one of the four validated
+  values (repo, file, branch, title) or `.agentguard/pr_body.md`. A test
+  flattens all tokens and asserts each is in that allowed set - nothing
+  arbitrary can appear.
+- **New terms:**
+  - **Command boundary** - the point where data is about to become an
+    executed command's argument; where validation must happen.
+  - **Input validation** - checking a value's form and content against
+    what is allowed before trusting it.
+  - **Fail at the boundary** - reject bad input at the entry point,
+    before any work, so nothing partial happens.
+  - **Path traversal** - using `..` or a leading `/` to escape an
+    intended directory.
+  - **Near-miss / typosquat** - a value that looks almost right
+    (`…-demos`) but is not the exact allowlisted one.
+  - **Transitive validation** - validating a derived value (the branch)
+    constrains the source value (the workflow id) it came from.
+- **Input / processing / output / security boundary.** Input:
+  `repository`, `workflow_id`, optional `file_path` (synthetic in
+  tests). Processing: `create_plan` calls the three validators first;
+  each raises `ValueError` on anything unapproved, *before* any command
+  tuple is built. Output: a validated `GitHubPlan`, or a `ValueError`.
+  Security boundary: pure - no `subprocess`, no `git` / `gh`, no
+  network. This lab tightens the boundary; it does not cross it.
+  `scanner.py` unchanged and still the sole risk authority. No secret
+  added.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `136 passed` (97 → 136 with the new parametrised matrices: 13
+  unapproved repos, 8 unsafe workflow ids, 6 unapproved branches on a
+  direct `GitHubPlan`, an off-allowlist repo on a direct `GitHubPlan`, 8
+  unapproved file paths, the "`main` id is still safe" case, the "every
+  command token is validated or literal" proof, and the valid-inputs
+  regression). Full suite → `658 passed` (up from `619`). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean; `git branch`
+  shows only `main` and `v4-development`.
+- **Why this lab exists.** The safety of the whole GitHub step reduces to
+  one property: no unapproved string ever reaches a `git` / `gh`
+  argument. Checking every input against the allowlist at the single
+  function that builds the commands - and re-checking in the type it
+  returns - makes that property provable, and turns a mistyped repo or a
+  malicious path into a `ValueError` at the door rather than a wrong or
+  dangerous command.
+- **What this lab did not do.** No real `git` / `gh` / network call, no
+  `v4_service.py` wiring, no PR body write step. Day 7 Lab 8 writes the
+  draft-only / dry-run test set. No git commit, tag, or push.
+
+## Day 7, Lab 8 — Write draft-only and dry-run automated tests
+
+- **The idea.** Day 7's capstone test lab. The GitHub layer makes two
+  promises: **draft-only** (every PR opens `--draft`, no `gh pr merge` /
+  `gh pr ready` / `--auto` anywhere) and **dry-run by default**
+  (`execute_plan(plan)` changes nothing; `live=True` is the one
+  keyword-only opt-in). This lab writes the **negative tests** that prove
+  both - asserting the dangerous commands are *absent*, over a matrix of
+  plans rather than one example.
+- **Why a matrix.** You cannot prove "there is no merge command" by
+  checking a single plan. The tests build plans for several workflow ids
+  (`GOOD_IDS = ["wf-1", "wf-9f2a1c", "abc123", "main", "x"*60]`),
+  flatten every command's tokens, and assert a **forbidden-token set**
+  (`merge`, `--merge`, `rebase`, `--auto`, `--force`, `-f`, `reset`,
+  `--hard`, `ready`, `-w`, `--web`) is entirely absent, and that no
+  command tuple is `git push … main`, `git checkout main` / `master`, or
+  starts `gh pr merge` / `gh pr ready`.
+- **What the new tests establish.**
+  - *The starter property* - `--draft` present in the flattened tokens,
+    `"merge"` absent, `execute_plan(plan)` all `DRY_RUN`.
+  - *No forbidden token or command, any plan* - the matrix above.
+  - *Exactly one `gh` command, and it is a draft `pr create`* - for
+    every plan.
+  - *The plan shape is fixed* - always five commands in the order
+    `checkout / add / commit / push / pr create`; no parameter can
+    insert a sixth (merge) step.
+  - *The only push targets the feature branch* - the single `git push`
+    command's last token is the `agentguard/` branch, never `main` /
+    `master` / `HEAD`.
+  - *The only checkout creates the feature branch* -
+    `("git", "checkout", "-b", <branch>)`, never a bare `git checkout
+    main`.
+  - *Dry-run default is side-effect-free* - `execute_plan(plan)` called
+    five times, with `subprocess.run` monkeypatched to raise, is still
+    all `DRY_RUN`.
+  - *The dry-run rows still show `--draft`* - so a reviewer reading the
+    dry-run output sees the PR would be a draft.
+  - *Live needs the named keyword* - `execute_plan(plan, True)` →
+    `TypeError`.
+- **Safety note.** After the Day 7 Lab 6 incident (a stale test ran real
+  `git` and made a local branch), every test that could touch
+  `subprocess` is either pure or monkeypatched; no Lab 8 test calls
+  `live=True` unmocked, and verification re-checks `git branch`.
+- **New terms:**
+  - **Negative / absence test** - asserts a bad thing does *not* appear.
+  - **Test matrix** - the same assertions over many inputs, so the
+    guarantee is comprehensive, not anecdotal.
+  - **Forbidden set** - an explicit list of tokens/commands that must
+    never appear; used only in tests.
+  - **Flatten** - collapsing the list-of-token-lists into one list to
+    search it.
+  - **Structural fixity** - the plan always has the same shape, so
+    nothing can be inserted.
+  - **Regression fence** - a test that fails loudly if a future change
+    re-introduces a removed danger.
+- **Input / processing / output / security boundary.** Input: synthetic
+  `repository` / `workflow_id` values. Processing: build plans, flatten,
+  check against the forbidden sets; run `execute_plan(plan)` (dry-run)
+  and assert `DRY_RUN`; monkeypatch `subprocess.run` for the
+  side-effect check. Output: test results only; no product behaviour
+  changed. Security boundary: pure or mocked - no real `git` / `gh` /
+  network call. `scanner.py` unchanged and still the sole risk
+  authority.
+- **Verification.** `python -m pytest -q tests/test_github_plan.py` →
+  `162 passed` (136 → 162 with the parametrised matrices). Full suite →
+  `684 passed` (up from `658`). `python scripts/run_release_gate.py`
+  still ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall
+  -q .` is clean; `git branch` shows only `main` and `v4-development`.
+- **Why this lab exists.** The GitHub layer's safety is a set of
+  *absences* - no merge, no `main` push, no `--force`, no non-draft PR,
+  no execution without opt-in. An absence is exactly what a single
+  example test cannot verify. A matrix over many plans, checking a
+  forbidden set and a fixed command shape, is what turns "we didn't add
+  a merge command" into a property that fails the build the moment
+  someone does.
+- **What this lab did not do.** No `github_plan.py` change, no
+  `v4_service.py`, no PR body write, no real `git` / `gh` / network
+  call. No git commit, tag, or push.
+
+## Day 7 Summary — Labs 1 through 8
+
+1. **Define repository, branch, and file-path allowlists** - `SAFE_REPO`
+   (shape) + `ALLOWLISTED_REPOSITORIES` / `ALLOWLISTED_FILE_PATHS`
+   (exact value) + `SAFE_BRANCH`; `require_allowlisted_repository /
+   branch / file_path`. Shape checks stop injection; value checks stop
+   wrong-target changes.
+2. **Create the GitHubPlan data contract** - a frozen `GitHubPlan`
+   (repository, branch, file_path, title, `commands` as a tuple of
+   token-tuples) that validates every field in `__post_init__`; an
+   invalid plan cannot be constructed.
+3. **Build safe branch and commit commands** - `create_plan()` fills
+   `commands` with `git checkout -b agentguard/<id>` / `add <the one
+   file>` / `commit` / `push -u origin <that branch>`; no `merge`, no
+   `checkout main`, no `--force`.
+4. **Build the draft pull request command** - a fifth command,
+   `gh pr create --draft --repo <repo> --title <title> --body-file
+   .agentguard/pr_body.md`; the PR begins in review state and cannot
+   merge itself.
+5. **Implement dry-run execution as the default** - `execute_plan(plan)`
+   returns one `{"command", "status": "DRY_RUN"}` row per command and
+   changes nothing.
+6. **Add explicit opt-in live execution** - `execute_plan(plan, *,
+   live=True)` runs each command via `subprocess` (token list, no shell,
+   `check=True` fail-fast); `live` is keyword-only. (One stale test ran
+   real `git` and made a local branch; cleaned up, no commit / push /
+   PR.)
+7. **Block unapproved repositories, paths, and branch names** -
+   `create_plan` validates all three input categories at its own entry,
+   before building any token; the AgentGuard source repo, `main`,
+   traversal paths, injection shapes are each a `ValueError` at the
+   door.
+8. **Write draft-only and dry-run automated tests** - the matrix that
+   proves no plan contains a forbidden token or command, every PR is
+   `--draft`, the plan is always the same five commands, and execution
+   is dry-run unless `live=True` is named.
+
+**Where Day 7 leaves off:** the GitHub layer is complete and tested -
+`github_plan.py` (allowlist + validators, `GitHubPlan`, `create_plan` →
+five commands, `execute_plan` dry-run-by-default with a keyword-only
+`live=True`), 162 tests. Every command token is a fixed literal or a
+validated value; there is no merge / `main` / `--force` / non-draft path.
+Not yet wired into an orchestrator - `v4_service.py` (approval → verify →
+audit → GitHub) is still to come - the PR body file
+(`.agentguard/pr_body.md`, from `render_pr_body()`) is not written by
+anything, and no live run has been performed. Everything since the Day 1
+baseline commit `517db77` is uncommitted on `v4-development`; the suite is
+at `684 passed`. Day 8 builds rollback: close the draft PR and delete its
+branch **before** merge (`DRAFT_PR_CREATED → ROLLED_BACK`); refuse
+automatic rollback **after** merge (a reviewed revert is required); and
+record the terminal `REJECTED` / `FAILED` / `ROLLED_BACK` states.
+
+## Day 8, Lab 1 — Understand rollback before and after merge
+
+- **The idea.** "Rolling back" a remediation means undoing the draft
+  pull request AgentGuard opened on the synthetic demo repo. How hard
+  that is depends on one thing: **has the change been merged yet?**
+  - *Before merge* - the change lives only on its own feature branch
+    inside an open **draft** PR. `main` was never touched and nothing
+    downstream depends on it. Undoing it is two cheap, fully-reversible
+    steps: **close the draft PR** and **delete the feature branch**.
+    Nothing needs repairing because nothing else ever saw the change.
+  - *After merge* - the change is now part of `main`, the shared history
+    every clone pulls from, and other commits may already sit on top of
+    it. You cannot cleanly pluck it out. The only safe fix is a **new
+    commit that reverses it** (`git revert`), and that new commit goes
+    through a normal reviewed pull request like any other change.
+  AgentGuard automates only the first case. For the second it **raises
+  an error and stops** - `"Automatic rollback is refused after merge.
+  Use a reviewed revert workflow."` - handing the problem back to a
+  human.
+- **Why the asymmetry.** The tempting "quick" way to undo a merge is to
+  rewrite history: `git reset --hard` to drop the commit, then a
+  **force-push** to overwrite the shared branch. That is itself an
+  unreviewed, destructive, autonomous action against shared
+  infrastructure - it silently breaks every teammate's clone and
+  anything built on the merged commit. It is exactly the class of
+  behaviour AgentGuard v4 exists to prevent. So the product **fails
+  closed**: it performs the rollback that is genuinely reversible and
+  refuses the one that is not, rather than guessing.
+- **How it maps to the state machine.** `workflow.py` already encodes
+  this. `DRAFT_PR_CREATED` has exactly one arrow out -
+  `DRAFT_PR_CREATED -> {ROLLED_BACK}` - and `ROLLED_BACK` is terminal
+  (empty transition set, so it appears in the derived
+  `TERMINAL_STATES`). There is deliberately **no `MERGED` state and no
+  automated transition leaving a merge**; the post-merge revert is a
+  manual human workflow that lives outside the automated map. Nothing in
+  this lab changes `workflow.py` - the shape was set on Day 5.
+- **The rollback command plan (built in Lab 2, previewed here).** The
+  starter `rollback.py` is a single function
+  `rollback_plan(repository, pr_number, branch, merged)` that returns a
+  list of two command token-lists when `merged` is false -
+  `gh pr close <n> --repo <repo> --comment "..."` and
+  `git push origin --delete <branch>` - and `raise ValueError(...)` when
+  `merged` is true. Same design as `github_plan.create_plan`: it returns
+  **reviewable command data**, it does not run anything. Both commands
+  are themselves reversible (a closed PR can be reopened, a deleted
+  remote branch can be re-pushed from a local copy), which is the whole
+  reason pre-merge rollback is safe to automate.
+- **New terms:**
+  - **Merge** - combining a feature branch's commits into a shared
+    branch such as `main`, after which they are part of the project's
+    permanent history.
+  - **Pre-merge rollback** - undoing a change while it still lives only
+    on its own branch in an open PR; cheap and fully reversible.
+  - **Post-merge rollback** - undoing a change that is already in shared
+    history; requires a new reversing commit, not a deletion.
+  - **`git revert`** - makes a *new* commit that undoes the effect of an
+    earlier commit while leaving all history intact.
+  - **`git reset --hard`** - discards commits and working changes to
+    move a branch backwards; destructive, and unsafe on a shared branch.
+  - **Force-push** - overwriting a remote branch with rewritten history
+    (`git push --force`); breaks every other clone of that branch.
+  - **Published / shared history** - commits that other people have
+    already pulled; the rule is you never rewrite it, only add to it.
+  - **Draft PR close** - closing a pull request without merging it; the
+    branch and commits still exist and it can be reopened.
+  - **Branch deletion** - removing the feature branch
+    (`git push origin --delete <branch>`) once its PR is closed.
+  - **Reviewed revert workflow** - a human opens a normal PR whose
+    content is a `git revert` commit, and it goes through review like
+    any other change.
+  - **Fail closed** - when the safe action is unavailable, refuse and
+    stop rather than attempt a risky substitute.
+- **Input / processing / output / security boundary.** Input: the
+  concept, the reviewed starter `rollback.py`, and the current
+  `workflow.py`. Processing: understanding only - no code, no
+  computation, no command run. Output: this learning-log entry.
+  Security boundary: pure documentation - no code path, no network, no
+  `git` / `gh` call, no subprocess, no secret. `scanner.py` stays the
+  sole risk authority; the AI layer still only explains or proposes
+  within its documented boundary.
+- **Verification.** No behaviour changed. `python -m pytest -q
+  tests/test_rollback.py tests/test_failure_paths.py` reports an error
+  that both paths do not exist - they are built in Day 8 Lab 2 and Lab 3
+  respectively, so their absence now is the expected pre-build state,
+  not a failure. The full suite is still `684 passed`; `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean; `git branch`
+  shows only `main` and `v4-development`.
+- **Why this lab exists.** An "undo" button that quietly rewrites shared
+  history is more dangerous than the change it reverses. Understanding
+  *before* writing the code that pre-merge and post-merge rollback are
+  fundamentally different problems - one reversible, one not - is what
+  lets the product draw the line in the right place: automate the safe
+  half, refuse the unsafe half out loud, and never let an automated
+  system force-push over work other people depend on.
+- **What this lab did not do.** No `rollback.py`, no `workflow.py`
+  change, no `tests/test_rollback.py`, no `tests/test_failure_paths.py`,
+  no `evals/run_v4_evals.py`, no `v4_service.py`. No git commit, tag,
+  push, PR, or any live `git` / `gh` action.
+
+## Day 8, Lab 2 — Create the pre-merge rollback command plan
+
+- **The idea.** When AgentGuard has opened a **draft pull request** on
+  the synthetic demo repo and it should not go ahead, rolling back the
+  *unmerged* case is two small, reversible steps: **close the pull
+  request** and **delete its feature branch**. This lab builds a new
+  `rollback.py` whose `rollback_plan(repository, pr_number, branch)`
+  *returns those two commands as token-lists* for a human to read - it
+  runs nothing. Same "data, not action" shape as
+  `github_plan.create_plan`.
+- **Line by line (`rollback.py`).**
+  - `from github_plan import require_allowlisted_branch,
+    require_allowlisted_repository` - reuse the exact Day 7 validators, so
+    rollback is as strict as `create_plan`.
+  - `ROLLBACK_COMMENT = "Closed by AgentGuard rollback."` - one fixed
+    string, so every closed PR carries the same visible reason.
+  - `require_allowlisted_repository(repository)` - OWNER/REPO shape *and*
+    exact membership of the one-repo allowlist; a space, `;`, `$(...)`,
+    or a second `/` never gets past this.
+  - `require_allowlisted_branch(branch)` - must match
+    `^agentguard/[a-z0-9-]{1,60}$`. This is the load-bearing check for
+    step 2: the branch delete can only ever target an `agentguard/`
+    feature branch, never `main`.
+  - `if isinstance(pr_number, bool) or not isinstance(pr_number, int) or
+    pr_number < 1: raise ValueError(...)` - a positive integer only.
+    `bool` is excluded explicitly because `True` is an `int` subclass and
+    `str(True)` would otherwise become the token `"True"`.
+  - the return: a `list` of two `list[str]` commands -
+    `["gh","pr","close",str(pr_number),"--repo",repository,"--comment",
+    ROLLBACK_COMMENT]` and
+    `["git","push","origin","--delete",branch]`. Token-lists, never a
+    shell string - there is no shell, so nothing to inject into.
+    `str(pr_number)` because command arguments are strings.
+- **Why these two commands are safe to automate.** Both are reversible:
+  a closed PR can be reopened; `git push origin --delete` removes only
+  the *remote* copy of a branch, and if a local copy exists it can be
+  re-pushed. Neither touches `main`, neither rewrites history, and there
+  is no `--force` anywhere. That is the whole reason pre-merge rollback
+  is automatable where post-merge rollback (Lab 3) is not.
+- **Deviation from the starter (compared, not copied).** The starter
+  `rollback.py` is a single function
+  `rollback_plan(repository, pr_number, branch, merged)` that also
+  contains the `if merged: raise ValueError("Automatic rollback is
+  refused after merge...")` branch, and it does **no input validation**
+  (its test passes `"owner/repo"`). Our Lab 2 version (a) omits the
+  `merged` parameter entirely - the merge refusal is Lab 3's named
+  behaviour, and "complete only the behavior named in this lab" applies;
+  (b) adds the Day 7 allowlist validation, chosen so the rollback
+  command producer is exactly as strict as `create_plan` rather than
+  looser. Same two commands, same comment string, same
+  `list[list[str]]` return shape.
+- **`tests/test_failure_paths.py` seeded.** The lab's verification
+  command runs `tests/test_rollback.py tests/test_failure_paths.py`
+  together, so the second file must exist for the first to be collected.
+  It is seeded with the starter's two general fail-closed tests -
+  `create_plan("not a safe repo value", ...)` raises (repo shape), and
+  `transition(PROPOSED -> VERIFIED)` raises (no state-skipping). Neither
+  is rollback-specific; they are pre-existing Day 5 / Day 7 guarantees
+  getting their permanent test home. Labs 3-7 add the merge-refusal,
+  verification-failure, stale-approval, and GitHub-command-failure
+  scenarios to this file.
+- **New terms:**
+  - **`gh pr close`** - GitHub CLI command that closes a pull request
+    without merging it; the PR can be reopened.
+  - **`git push origin --delete <branch>`** - deletes a branch on the
+    remote named `origin`; not a force-push, not a history rewrite.
+  - **Feature branch** - a short-lived branch holding one proposed
+    change (always `agentguard/<workflow-id>` here), separate from the
+    shared `main`.
+  - **Remote branch** - the copy of a branch on the GitHub server, as
+    opposed to your local copy.
+  - **Reversible operation** - an action that can be cleanly undone; the
+    property that makes pre-merge rollback safe to automate.
+  - **Command plan / "data, not action"** - a function that returns the
+    exact commands that *would* run, for review, instead of running
+    them.
+  - **Forbidden-token test** - a test asserting a dangerous token
+    (`merge`, `--force`, `reset`, `--hard`, `revert`, ...) never appears
+    in a produced command.
+  - **Purity test** - a test proving a function has no side effects;
+    here `rollback.py` does not even import `subprocess`, and calling
+    `rollback_plan` twice returns equal lists.
+- **Input / processing / output / security boundary.** Input:
+  `repository` (must be the one allowlisted synthetic demo repo),
+  `pr_number` (positive int), `branch` (must match the `agentguard/`
+  shape) - all synthetic. Processing: validate the three inputs via the
+  Day 7 validators, then build two token-lists. Output: `list[list[str]]`
+  - the close command and the branch-delete command - plus test results.
+  Security boundary: pure string assembly and regex validation.
+  `rollback.py` does **not** import `subprocess` and makes no `git` /
+  `gh` / network call. No unapproved string can reach a command
+  argument. `scanner.py` stays the sole risk authority; nothing here
+  scores, approves, or executes.
+- **Verification.** `python -m pytest -q tests/test_rollback.py
+  tests/test_failure_paths.py` → `30 passed` (28 new rollback tests + 2
+  seeded failure-path tests). Full suite → `714 passed` (up from `684`,
+  +30, no regression). `python scripts/run_release_gate.py` still ends
+  `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .` is
+  clean; `git status --short` shows only new `rollback.py`,
+  `tests/test_rollback.py`, `tests/test_failure_paths.py` and modified
+  `notes/learning_log.md`; `git branch` shows only `main` and
+  `v4-development`.
+- **Why this lab exists.** The rollback path needs the same discipline as
+  the forward path: the commands that undo a change must be reviewable
+  data, must be built only from validated inputs, and must not contain a
+  `--force` or a `main` push. Turning "close the PR and delete the
+  branch" into a small pure function with an explicit allowlist and a
+  forbidden-token test is what makes the reversible half of rollback
+  trustworthy - and sets up Lab 3 to refuse the irreversible half.
+- **What this lab did not do.** No `merged` parameter and no
+  merge-refusal (Lab 3). No `workflow.py` change and no terminal-state
+  recording (Lab 4). No `evals/run_v4_evals.py` (Lab 8). No execution
+  wiring - `rollback_plan` is never run, only built. No `v4_service.py`.
+  No git commit, tag, push, PR, or any live `git` / `gh` action.
+
+## Day 8, Lab 3 — Refuse automatic rollback after merge
+
+- **The idea.** Lab 2's `rollback_plan` had no idea whether the PR it was
+  rolling back had been merged. This lab makes the caller say so - a new
+  keyword-only argument `merged` - and **refuses** when it is `True`.
+  Once a remediation PR is merged into `main`, its change is part of
+  shared history that other people's clones and later commits may build
+  on. The only safe way to undo it is a **new `git revert` commit that
+  goes through review** like any other change. AgentGuard does not
+  automate that, so `rollback_plan(..., merged=True)` raises
+  `ValueError("Automatic rollback is refused after merge. Use a reviewed
+  revert workflow.")` and returns no command at all.
+- **The code change (`rollback.py`).** Two lines added at the very top of
+  the function, before any validation or token building:
+  - `if not isinstance(merged, bool): raise ValueError("merged must be a
+    bool: ...")` - a factual flag about PR state must be a real boolean.
+    Without this, `merged=0`, `merged=""`, `merged=None` would all be
+    *falsy* and the function would happily build a rollback plan for a
+    PR that might actually be merged. Type-checking closes that
+    fail-open gap.
+  - `if merged: raise ValueError("Automatic rollback is refused after
+    merge. Use a reviewed revert workflow.")` - the refusal. It happens
+    *first*, so a merged PR is refused regardless of whether the repo,
+    branch, or PR number are valid, and no partial plan is ever produced.
+  The signature is now `rollback_plan(repository, pr_number, branch, *,
+  merged: bool)`. The unmerged path (`merged=False`) is byte-for-byte
+  the Lab 2 behaviour - same two commands, same validation.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `rollback_plan(repository, pr_number, branch, merged)` takes `merged`
+  as a bare positional with no default and no type check. Ours makes it
+  **keyword-only and required** (`*, merged`): the caller must type
+  `merged=...`, which (a) matches the Day 7 house pattern for a
+  consequential flag (`execute_plan(plan, *, live=...)`), (b) removes any
+  fail-open default, and (c) blocks the `rollback_plan(repo, n, branch,
+  True)` positional-argument confusion. It also **type-checks `merged` to
+  `bool`**. The refusal message itself is the starter's, verbatim.
+- **Why "merged ⇒ refuse" and not "merged ⇒ revert automatically".**
+  Undoing a merged commit safely means `git revert` - a *new* commit that
+  reverses the change while leaving history intact - opened as its own
+  reviewed PR. The unsafe shortcut is `git reset --hard <before>` then
+  `git push --force`, which erases the commit from the shared branch and
+  breaks every other clone. An automated tool cannot tell which
+  downstream work now depends on the merged change, so it must not choose
+  the shortcut. Refusing and naming the reviewed-revert path is the
+  fail-closed answer.
+- **New terms:**
+  - **Merge into `main`** - combining a feature branch's commits into the
+    shared branch, making them permanent project history.
+  - **Shared / published history** - commits other people have already
+    pulled; the rule is you add to it, never rewrite it.
+  - **`git revert`** - a new commit that undoes an earlier commit's
+    effect while keeping all history; the safe post-merge undo.
+  - **Force-push / history rewrite** - `git push --force` after moving a
+    branch backwards; overwrites the remote and breaks other clones.
+  - **Reviewed revert workflow** - a human opens a normal PR whose
+    content is a `git revert` commit, reviewed like any change.
+  - **Keyword-only argument** - a parameter after `*` in the signature
+    that callers must pass by name (`merged=True`), never positionally.
+  - **`bool` is an `int` subclass** - in Python `isinstance(True, int)`
+    is `True` and `True == 1`, so a `bool` guard is needed anywhere an
+    integer or a strict boolean is expected.
+  - **Fail-open vs fail-closed default** - a default that proceeds when
+    information is missing (fail-open) vs one that stops (fail-closed);
+    `merged` has no default so the question can't be skipped.
+- **Input / processing / output / security boundary.** Input: the Lab 2
+  inputs plus `merged` (must be a real `bool`). Processing: check
+  `merged` first (type, then truth); if unmerged, run the Lab 2
+  validation and build the two commands. Output: for an unmerged PR, the
+  same `list[list[str]]` two-command plan; for a merged PR, a raised
+  `ValueError` and nothing else. Security boundary: unchanged from Lab 2
+  - pure string/regex work, `rollback.py` still imports no `subprocess`,
+  no `git` / `gh` / network call. `scanner.py` stays the sole risk
+  authority.
+- **Verification.** `python -m pytest -q tests/test_rollback.py
+  tests/test_failure_paths.py` → `44 passed` (was 30: the 28 rollback
+  tests updated to pass `merged=False`, +13 new merge-refusal /
+  keyword-only / type-check tests, +1 new test in `test_failure_paths.py`
+  → 41 + 3). Full suite → `728 passed` (up from `714`, +14, no
+  regression). `python scripts/run_release_gate.py` still ends `RELEASE
+  GATE PASS for AgentGuard v4`; `python -m compileall -q .` is clean;
+  `git status --short` shows only modified `rollback.py`,
+  `tests/test_rollback.py`, `tests/test_failure_paths.py`,
+  `notes/learning_log.md`; `git branch` shows only `main` and
+  `v4-development`.
+- **Why this lab exists.** "Silently changing shared history" is one of
+  the most damaging things an automated agent can do to a codebase - it
+  is data loss that also breaks everyone else's working copy. By forcing
+  the caller to declare the merge state and refusing the merged case
+  outright, AgentGuard guarantees it will never issue a `reset` or
+  `--force` against `main`. The refusal is not a limitation to work
+  around; it is the product correctly recognising that the safe undo is a
+  human-reviewed revert.
+- **What this lab did not do.** No `workflow.py` change - there is still
+  no `MERGED` state and no automated transition out of a merge (by
+  design). No terminal-state recording (Lab 4). No
+  `evals/run_v4_evals.py` (Lab 8). No execution - `rollback_plan` is
+  still only built, never run. No `git revert` implementation (that path
+  is deliberately manual). No git commit, tag, push, PR, or live action.
+
+## Day 8, Lab 4 — Record rejected / failed / rolled-back terminal states
+
+- **The idea.** A remediation workflow can end three ways that are *not*
+  success: `REJECTED` (a human declined the proposal), `FAILED` (a
+  required check failed - fail closed), `ROLLED_BACK` (a draft PR was
+  closed and its branch deleted). The audit trail has to record those
+  endings just as deliberately as it records a successful step -
+  otherwise the log for a failed run just stops, and a reviewer cannot
+  tell "failed", "abandoned", and "still running" apart. This lab adds
+  one helper, `workflow.record_terminal_state(...)`, that does
+  "take the terminal step, then write the audit row" in a single call.
+- **The helper, line by line (`workflow.py`).**
+  - `from audit_db import record_event` - the state machine module now
+    depends on the audit module. No import cycle: `audit_db` imports only
+    the standard library (`json`, `sqlite3`, `datetime`, `pathlib`).
+  - `TERMINAL_EVENT_TYPES = {"REJECTED": "workflow_rejected", "FAILED":
+    "workflow_failed", "ROLLED_BACK": "workflow_rolled_back"}` - one fixed
+    `event_type` string per terminal state, so every recorded ending of a
+    given kind is queryable by the same name.
+  - `record_terminal_state(db_path, current, terminal_state, *, reason,
+    details=None)`:
+    - `if terminal_state not in TERMINAL_STATES: raise ValueError(...)` -
+      this helper is *only* for recording an ending. A non-terminal
+      target (`"VERIFIED"`, `"SCANNED"`) is refused here, before any
+      write.
+    - `if not isinstance(reason, str) or not reason.strip(): raise
+      ValueError("reason must be a non-empty string")` - an unsuccessful
+      ending with no recorded "why" is not a useful audit record.
+      `reason` is **keyword-only** (after `*`), so a caller has to name
+      it.
+    - `new_state = transition(current, terminal_state)` - the move goes
+      through the *unchanged* Day 5 guard. So an illegal arrow
+      (`SCANNED -> ROLLED_BACK`; a second terminal step out of an
+      already-terminal state) raises here, and nothing is written. The
+      audit log can never contain a terminal state the state machine
+      would have rejected.
+    - `payload = dict(details or {}); payload["reason"] =
+      reason.strip()` - merge the optional structured `details`, then set
+      `reason` last so the explicit argument always wins over a stray
+      `details["reason"]`.
+    - `record_event(db_path, new_state.workflow_id,
+      TERMINAL_EVENT_TYPES[terminal_state], new_state.state, payload)` -
+      one append-only row, written *after* the transition succeeded.
+    - `return new_state`.
+- **`transition()` is unchanged and still pure.** It writes nothing; the
+  new write lives in a *separate* sibling function. `docs/v4_state_machine.md`
+  still correctly says "`transition()` ... stays a pure guard". Adding the
+  new public helper to that doc is deferred to Day 10 Lab 5 with the
+  other reconciliation items.
+- **Deviation from the starter (compared, not copied).** The starter has
+  no terminal helper - its bare `workflow.py` only has `transition()`,
+  and terminal states are recorded **inline** inside `v4_service.py`
+  (`state = transition(state, "FAILED"); record_event(DB_PATH,
+  workflow_id, "verification_failed", state.state, verification.to_dict())`).
+  We have no `v4_service.py` yet, so rather than copy that pattern into a
+  file that does not exist - or leave every future caller to re-invent it
+  with a different event name - we factor it into the one reusable
+  `record_terminal_state()`. Same two underlying operations
+  (`transition` + append-only `record_event`), just named and in one
+  place. The starter passes a structured dict as the payload; we keep
+  that option (`details`) and add a mandatory `reason`.
+- **Why `rollback.py` did not change.** Labs 2-3 established `rollback.py`
+  as a *pure command-plan producer* - it builds `git` / `gh` token-lists
+  and does no I/O. Writing to a database is not its job. The
+  `ROLLED_BACK` audit event is written by `workflow.record_terminal_state`,
+  and `tests/test_rollback.py` shows the two as separate steps: building
+  the plan records nothing; the audit row appears only when the workflow
+  layer records the ending.
+- **New terms:**
+  - **Terminal state** - a workflow state with no outgoing arrow; the run
+    stops there. `TERMINAL_STATES = {ROLLED_BACK, REJECTED, FAILED}`.
+  - **Terminal event type** - the fixed audit `event_type` string logged
+    for each terminal state (`workflow_rejected` / `workflow_failed` /
+    `workflow_rolled_back`).
+  - **`record_terminal_state`** - the "transition + record the ending"
+    helper added this lab.
+  - **Audit-trail completeness** - every consequential step, success or
+    failure, becomes exactly one immutable row; nothing is edited or
+    deleted, so the history is complete evidence.
+  - **Fail-closed recording** - when a check fails, the workflow moves to
+    `FAILED` *and that move is logged*, rather than the process silently
+    stopping.
+  - **Legal (ordered) walk** - the sequence of `state` values in
+    `list_events()` is only ever moves `ALLOWED_TRANSITIONS` permits, in
+    the true order they happened.
+  - **Keyword-only argument** - a parameter after `*` that must be passed
+    by name (`reason="..."`).
+- **Input / processing / output / security boundary.** Input: a SQLite
+  `db_path` (a `tmp_path` file in tests), the current `WorkflowState`, a
+  `terminal_state` string, a required non-empty `reason`, optional
+  `details` dict - all synthetic. Processing: validate the target is
+  terminal and `reason` is a non-empty string; `transition()` (all Day 5
+  guard checks apply); build `{**details, "reason": reason}`;
+  `record_event()`. Output: one new `workflow_events` row and the new
+  `WorkflowState`; on any failure, a `ValueError` / `TypeError` and
+  **nothing written**. Security boundary: `transition()` stays pure;
+  `audit_db.py` untouched; no `subprocess` / `git` / `gh` / network;
+  SQLite writes only ever go to a caller-supplied path (tests use
+  `tmp_path`, and `*.db` is git-ignored). `scanner.py` unchanged and
+  still the sole risk authority.
+- **Verification.** `python -m pytest -q tests/test_rollback.py
+  tests/test_failure_paths.py tests/test_workflow.py` → `139 passed`
+  (+37: 33 in `test_workflow.py` → 91, +2 in `test_failure_paths.py` → 5,
+  +2 in `test_rollback.py` → 43). Full suite → `765 passed` (up from
+  `728`, no
+  regression - `tests/test_audit_db.py`, which imports `workflow`, still
+  passes, confirming no import cycle). `python scripts/run_release_gate.py`
+  still ends `RELEASE GATE PASS for AgentGuard v4` (including
+  `test_docs_consistency.py`); `python -m compileall -q .` is clean;
+  `git status --short` shows only modified `workflow.py`,
+  `tests/test_workflow.py`, `tests/test_failure_paths.py`,
+  `tests/test_rollback.py`, `notes/learning_log.md` (no new files;
+  `rollback.py` unchanged); `git branch` shows only `main` and
+  `v4-development`.
+- **Why this lab exists.** In an incident review, the audit log is the
+  first thing an auditor reads - and the runs that matter most are the
+  ones that did *not* succeed. A system that logs happy paths carefully
+  but goes silent on a rejection or a failed check is unauditable exactly
+  where it counts. Making the unsuccessful ending a single, mandatory,
+  reason-carrying, guard-checked write - `record_terminal_state` - is
+  what guarantees the trail is complete: every workflow's last row says
+  how and why it ended.
+- **What this lab did not do.** No `audit_db.py` change. No
+  `transition()` change (still pure). No `v4_service.py` - the helper
+  exists ready for the future orchestrator to call. No
+  `evals/run_v4_evals.py` (Lab 8). No `rollback.py` change. No wiring of
+  `record_terminal_state` into any product flow yet - it is exercised
+  only by tests. `docs/v4_state_machine.md` update deferred to Day 10
+  Lab 5. No git commit, tag, push, PR, or live action.
+
+## Day 8, Lab 5 — Simulate verification failure
+
+- **The idea.** `verifier.verify()` (Day 6) already returns a
+  `VerificationResult` with `passed=False` and named failing rows for a
+  bad proposal. What did not exist was the **gate**: nothing stopped a
+  caller from taking a failed result and calling
+  `github_plan.create_plan()` anyway. This lab adds one small function,
+  `verifier.require_verified(result)` - return the result if it passed,
+  otherwise `raise ValueError` naming every failed check. A caller builds
+  a GitHub plan only *after* `require_verified` returns, so a change that
+  did not verify never becomes a branch, a commit, or a draft PR. The
+  simulated scenario proves it end to end.
+- **The gate, line by line (`verifier.py`).**
+  - `if not isinstance(result, VerificationResult): raise TypeError(...)` -
+    the gate only understands a real `VerificationResult`; a dict that
+    happens to have a truthy `"passed"` key is not accepted as proof.
+  - `if not result.passed:` - the single boolean `verify()` already
+    computed as `all(row["passed"] for row in checks)`.
+  - `failed = [row["name"] for row in result.checks if not
+    row["passed"]]` - collect the human-readable names of exactly the
+    rows that failed.
+  - `raise ValueError("Verification failed; GitHub planning is blocked. "
+    f"Failed checks: {failed}")` - one plain-English message that both
+    stops the flow and says why. Same "raise on failure" contract as
+    `approval.validate_approval()`.
+  - `return result` - on success, hand the same object back so a caller
+    can write `result = require_verified(verify(env, proposal))`.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `verifier.py` has no gate; the stop-planning decision is inline in
+  `v4_service.py`: `if not verification.passed: state = transition(state,
+  "FAILED"); record_event(...); raise RuntimeError("Verification
+  failed")`. We have no `v4_service.py`, so instead of copying that
+  inline check we factor it into one reusable, testable
+  `require_verified()`. It raises `ValueError` (this codebase's
+  validation-failure convention - `validate_approval`,
+  `require_allowlisted`) rather than the starter's `RuntimeError`, and it
+  does no I/O: recording the `FAILED` terminal state is a separate step
+  the caller does with Lab 4's `record_terminal_state`.
+- **The simulated failure.** `tests/test_failure_paths.py` builds a
+  synthetic one-agent environment (a low-risk Billing Agent) and a
+  hand-built proposal whose `field_changes` give it a destructive tool
+  (`delete_invoice`) and sensitive-data access with no approval - which
+  would make it HIGH risk. `verify()` runs v1's scanner before and after
+  on isolated copies, sees the HIGH count go 0 -> 1, and fails the
+  "high-risk count did not increase" check. `require_verified` then
+  raises, `create_plan()` is never reached, and the workflow is recorded
+  `APPROVED -> FAILED` with the failed-check list in the payload. A
+  positive-control test proves a *good* proposal clears the gate and
+  reaches a five-command `GitHubPlan` - so the gate is not just
+  rejecting everything.
+- **New terms:**
+  - **Verification gate** - a check that must pass before the workflow
+    may advance to the next stage (here, before GitHub planning).
+  - **`require_verified`** - the gate function added this lab.
+  - **Stop the line / fail closed** - when a required check fails the
+    process halts (and is recorded) rather than continuing to the next
+    step.
+  - **Positive control** - a test that the *good* input still flows all
+    the way through, so a passing test suite is not just a gate that
+    blocks everything.
+- **Input / processing / output / security boundary.** Input: a
+  `VerificationResult` (from `verify()`) - synthetic. Processing:
+  type-check it is a `VerificationResult`; if `not result.passed`,
+  gather the failing row names and `raise ValueError`; else return it
+  unchanged. Output: the same `VerificationResult` on success; a
+  `ValueError` (naming failed checks) or `TypeError` on failure. Security
+  boundary: `require_verified` is pure - no I/O, no `subprocess` / `git`
+  / `gh` / network. It reads only `result.passed` and the check-row
+  names; it never inspects, computes, or sets a risk score - `scanner.py`
+  stays the sole risk authority. `github_plan.py`, `workflow.py`,
+  `audit_db.py`, `rollback.py` are untouched.
+- **Verification.** `python -m pytest -q tests/test_rollback.py
+  tests/test_failure_paths.py tests/test_verifier.py` → `113 passed`
+  (+13: +11 in `test_verifier.py` for `require_verified`, +2 in
+  `test_failure_paths.py` for the stop-planning scenario + positive
+  control). Full suite → `778 passed` (up from `765`, no regression).
+  `python scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean; `git status
+  --short` shows only modified `verifier.py`, `tests/test_verifier.py`,
+  `tests/test_failure_paths.py`, `notes/learning_log.md`; `git branch`
+  shows only `main` and `v4-development`.
+- **Why this lab exists.** A verifier that can detect a bad change but
+  cannot *stop* one is only half a control. `require_verified` is the
+  explicit, single choke point between "we checked the change" and "we
+  are about to open a pull request for it" - and because it raises rather
+  than returning a flag a caller might forget to read, the failure
+  cannot be silently ignored. The failed-check names travel with the
+  exception and into the audit payload, so an operator sees exactly which
+  invariant the proposed remediation would have broken.
+- **What this lab did not do.** No `github_plan.py` change - the gate
+  lives on the verifier side. No `workflow.py` / `audit_db.py` /
+  `rollback.py` change. No `v4_service.py`. No `evals/run_v4_evals.py`
+  (Lab 8). `require_verified` is not yet wired into a product flow - it
+  is exercised only by tests. No git commit, tag, push, PR, or live
+  action.
+
+## Day 8, Lab 6 — Simulate stale approval
+
+- **The idea.** An `ApprovalRecord` is bound to two fingerprints: the
+  exact proposal that was reviewed and the exact source environment it
+  was built against. `validate_approval()` (Day 4) re-checks both right
+  before a change would be applied and **raises** if either has drifted
+  since sign-off - "Approval is stale because the proposal changed." /
+  "...source changed." This lab adds the non-raising companion,
+  `approval.approval_is_current(record, proposal_sha256, source_sha256)
+  -> bool`, and simulates the drift end to end: a stale approval fails
+  the `APPROVED -> VERIFIED` re-check, the workflow is recorded `FAILED`,
+  and the only way forward is a fresh `decide()` against the new hashes -
+  a new human review.
+- **The companion, line by line (`approval.py`).**
+  - `try: validate_approval(record, proposal_sha256, source_sha256);
+    return True` - if the raising gate is happy, the approval is current.
+  - `except ValueError: return False` - any of its three failure reasons
+    (decision not APPROVE, proposal hash drifted, source hash drifted)
+    means a re-review is needed.
+  So `approval_is_current()` has **no logic of its own** - it is defined
+  entirely in terms of `validate_approval()`, which is why the two can
+  never disagree. `validate_approval()` *enforces* freshness (raises,
+  used right before applying a change); `approval_is_current()` *reports*
+  it (returns a bool, used to render a status or a "re-review needed"
+  banner without a `try/except` at the call site - the Day 9 UI will need
+  this form).
+- **Deviation from the starter (compared, not copied).** The starter's
+  `approval.py` is functionally identical to ours but has **no predicate
+  form**, and its `v4_service.py` calls `validate_approval(approval,
+  proposal_hash, source_hash)` immediately with the same hashes it just
+  decided with - so the stale path there is a latent, never-exercised
+  capability. We add `approval_is_current()`, an explicit drift
+  simulation, and we tie the failed re-check to Lab 4's
+  `record_terminal_state` for the `APPROVED -> FAILED` audit row (the
+  starter would inline that in `v4_service`, which we do not have).
+- **The simulated drift (`tests/test_failure_paths.py`).** A synthetic
+  two-agent environment. A reviewer approves turning on human approval
+  for the Support Agent - `record`, `proposal_hash`, `source_hash` are
+  captured, and the workflow is driven `DISCOVERED -> ... -> APPROVED`.
+  Then a *different* agent's tool list is widened after sign-off, so
+  `sha256_value(drifted_env)` no longer equals `source_hash`.
+  `approval_is_current(record, proposal_hash, drifted_hash)` is `False`;
+  `validate_approval(...)` raises `"source changed"`. The workflow is
+  recorded `APPROVED -> FAILED` with both the approved and the current
+  source hash in the payload. A brand-new `decide()` against
+  `drifted_hash` produces a `new_record` that *is* current - and the
+  original `record` never becomes current again (one approval, one
+  triple). A second test does the same for proposal drift (the proposal
+  regenerated for a different agent -> `"proposal changed"`).
+- **New terms:**
+  - **Stale approval** - an approval whose bound proposal or source hash
+    no longer matches the current one; the sign-off is for a world that
+    has changed.
+  - **Approval binding / two fingerprints** - an `ApprovalRecord` stores
+    `proposal_sha256` and `source_sha256`; validity requires *both* to
+    still match.
+  - **Non-raising predicate vs guard** - a predicate returns a bool for
+    the caller to branch on (`approval_is_current`); a guard raises to
+    stop the flow (`validate_approval`). Same question, two shapes.
+  - **Re-review** - a fresh human `decide()` against the changed hashes;
+    in v4 that is a *new* workflow, not a backward edge from `FAILED`.
+  - **One-time authorization** - an approval is valid for exactly one
+    (decision=APPROVE, proposal hash, source hash) triple and cannot be
+    repaired or replayed.
+- **Input / processing / output / security boundary.** Input: an
+  `ApprovalRecord` and the two current hashes - synthetic. Processing:
+  call `validate_approval()` inside `try`; map "no exception" to `True`
+  and `ValueError` to `False`. Output: a `bool`. It never raises for the
+  inputs it is meant for. Security boundary: `approval_is_current` is
+  pure - no I/O, no `subprocess` / `git` / `gh` / network. It reads only
+  the record's decision and the two hash strings; it never inspects,
+  computes, or sets a risk score - `scanner.py` stays the sole risk
+  authority. `proposal_hash.py`, `workflow.py`, `audit_db.py`,
+  `rollback.py` are untouched. Test DB writes go to a `tmp_path` file.
+- **Verification.** `python -m pytest -q tests/test_rollback.py
+  tests/test_failure_paths.py tests/test_approval.py` → `106 passed`
+  (+16: +14 in `test_approval.py` for `approval_is_current` - including
+  an 8-case grid proving it agrees with `validate_approval` on every
+  combination - and +2 in `test_failure_paths.py` for the source-drift
+  and proposal-drift scenarios). Full suite → `794 passed` (up from
+  `778`, no regression). `python scripts/run_release_gate.py` still ends
+  `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .` is
+  clean; `git status --short` shows only modified `approval.py`,
+  `tests/test_approval.py`, `tests/test_failure_paths.py`,
+  `notes/learning_log.md`; `git branch` shows only `main` and
+  `v4-development`.
+- **Why this lab exists.** A human's sign-off is trustworthy only for the
+  exact thing they saw. If the proposal is regenerated or the environment
+  moves after approval, silently proceeding would apply a change nobody
+  actually vetted. Pinning the approval to two content hashes and
+  re-checking them at the last moment turns "did anything change since
+  approval?" from a question a tired operator might not ask into an
+  automatic gate - and `approval_is_current()` lets the UI surface that
+  state *before* the operator clicks, so the re-review is expected rather
+  than a surprise failure.
+- **What this lab did not do.** No `proposal_hash.py` change (already
+  complete - the scenario only *uses* `sha256_value`). No `workflow.py` /
+  `audit_db.py` / `rollback.py` change. No `v4_service.py`. No backward
+  `FAILED -> PROPOSED` edge - a re-review is a new workflow, by design.
+  No `evals/run_v4_evals.py` (Lab 8). `approval_is_current` is not yet
+  wired into a product flow - it is exercised only by tests. No git
+  commit, tag, push, PR, or live action.
+
+## Day 8, Lab 7 — Simulate GitHub authentication and command failure
+
+- **The idea.** The GitHub layer runs its five commands one at a time
+  via `github_plan.execute_plan(plan, live=True)`. This lab does not add
+  code - it *simulates* the two ways that live run can go wrong -
+  `gh` is not logged in, or a `git`/`gh` command exits non-zero
+  mid-plan - and pins the guarantee: the error is **surfaced** (it
+  raises, with the exit code and stderr intact) and there is **no
+  partial continuation** (no command after the failing one is
+  attempted; the draft PR is never created; the workflow fails closed
+  from `VERIFIED`).
+- **What "fail-fast" already means.** `execute_plan`'s live loop calls
+  `subprocess.run(list(command), check=True, text=True,
+  capture_output=True)`. `check=True` is the whole mechanism: a non-zero
+  exit raises `subprocess.CalledProcessError` there and then, the `for`
+  loop never reaches the next command, and the partial `results` list is
+  discarded rather than returned. `docs/v4_github_demo_setup.md` already
+  states this ("...stops the run - it never continues past a failed
+  step"). Lab 7 turns that sentence into tests.
+- **The simulated failures (`tests/test_failure_paths.py`).** A `_FakeRun`
+  class replaces `subprocess.run` (via `monkeypatch`): it records every
+  call and raises `CalledProcessError(1, cmd, stderr=...)` when a command
+  token matches `fail_on`.
+  - *Auth failure:* `fail_on="--draft"` (only `gh pr create` carries
+    that), `stderr` = a realistic "gh: To get started with GitHub CLI,
+    please run: gh auth login / HTTP 401: Bad credentials" (synthetic, no
+    real token). `execute_plan(plan, live=True)` raises
+    `CalledProcessError`; the exception's `returncode` is `1` and its
+    `stderr` still contains `gh auth login`.
+  - *Mid-plan command failure:* `fail_on="push"` (command 4 of 5).
+    `execute_plan` raises, and `fake.calls` has **exactly 4** entries -
+    `gh pr create` (command 5) is never in the call list.
+  - *Dry run is immune:* a `_FakeRun` that raises on every call, with
+    `execute_plan(plan)` (no `live=`), still returns five `DRY_RUN` rows
+    and `fake.calls == []` - the failure only exists on the opted-in
+    live path.
+- **The audit tie-in.** When the live run fails, the workflow is still
+  at `VERIFIED` - `DRAFT_PR_CREATED` is only reached *after* the PR
+  exists. So it fails closed along the real arrow `VERIFIED -> FAILED`
+  (Lab 4's `record_terminal_state`), with the failed command,
+  `returncode`, and `stderr` in the payload. The test asserts no
+  `DRAFT_PR_CREATED` event was ever written and the recorded walk is a
+  legal `ALLOWED_TRANSITIONS` path ending `VERIFIED -> FAILED`.
+- **Why rollback execution stays manual.** `rollback.py` has no executor
+  and no `subprocess` import - the operator runs the two rollback
+  commands (`gh pr close`, `git push origin --delete`) by hand and sees
+  any `gh`/`git` error directly in their terminal. This matches the
+  starter (Day 10 Lab 3/4 is the one place a human runs a live action).
+  A test pins that fact: `rollback` has no `execute_rollback` and imports
+  no `subprocess`.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `execute_plan` is the same fail-fast shape but has **no**
+  auth-failure test and no audit tie-in for a failed run. We add the
+  explicit simulation and the `VERIFIED -> FAILED` recording (the
+  starter would inline that in `v4_service`, which we do not have).
+- **New terms:**
+  - **`subprocess.CalledProcessError`** - the exception Python raises
+    when a `subprocess.run(..., check=True)` command exits non-zero;
+    carries `.cmd`, `.returncode`, `.stderr`.
+  - **Exit / return code** - the integer a process returns; `0` is
+    success, anything else is a failure.
+  - **`capture_output` / stderr** - `subprocess.run(capture_output=True)`
+    keeps the command's standard error so the caller can show *why* it
+    failed instead of a bare code.
+  - **Fail-fast** - stop at the first error rather than pressing on.
+  - **Partial continuation / partial failure** - running some steps of a
+    multi-step action and then a later step failing, leaving a
+    half-applied state. `check=True` + one-command-at-a-time avoids it
+    here.
+  - **`gh auth status`** - the GitHub CLI command that reports whether
+    (and as whom) you are logged in; the token lives in the OS keyring,
+    never in the repo.
+- **Input / processing / output / security boundary.** Input: a
+  `GitHubPlan` from `create_plan` + a fake `subprocess.run` - all
+  synthetic. Processing: `execute_plan(plan, live=True)` iterates the
+  commands; the fake raises on the chosen one; the loop stops. Output
+  (tests): the raised `CalledProcessError`, the recorded call list, and
+  (for the audit test) one `workflow_failed` row. Security boundary:
+  **no product code changed**; `github_plan.py`, `rollback.py`,
+  `workflow.py`, `audit_db.py` untouched. Every test monkeypatches
+  `subprocess.run` **before** any `live=True` call - no real `gh` /
+  `git` / network call happens, and `git branch` still shows only `main`
+  and `v4-development` (Day 7 Lab 6 rule). `scanner.py` unchanged and
+  still the sole risk authority.
+- **Verification.** `python -m pytest -q tests/test_rollback.py
+  tests/test_failure_paths.py` → `58 passed` (+6, all in
+  `test_failure_paths.py`: auth failure surfaced, no command after a
+  failed one, dry run immune, failed run recorded `VERIFIED -> FAILED`,
+  the all-succeed positive control, rollback-is-manual). Full suite →
+  `800 passed` (up from `794`, no regression). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean; `git status
+  --short` shows only modified `tests/test_failure_paths.py` and
+  `notes/learning_log.md`; `git branch` shows only `main` and
+  `v4-development`.
+- **Why this lab exists.** An automated action layer that talks to an
+  external system will eventually hit an expired token, a revoked
+  permission, or a network blip. The dangerous outcome is a *partial*
+  one - a branch pushed but no PR, or a PR half-created - because that
+  leaves the repo in a state no one decided on and a retry might
+  double-apply. AgentGuard runs the commands one at a time under
+  `check=True`, so the first failure stops everything and raises with
+  the real error attached; the workflow is then recorded `FAILED` at the
+  state it actually reached, and a human restarts from a known point.
+- **What this lab did not do.** No `github_plan.py` change - its
+  fail-fast loop was already correct and is not in the lab's path list.
+  No `rollback.py` executor (rollback stays manual). No `workflow.py` /
+  `audit_db.py` change. No `v4_service.py`. No `evals/run_v4_evals.py`
+  (Lab 8). No real `gh` / `git` / network call - every test
+  monkeypatches `subprocess.run`. No `DRAFT_PR_CREATED -> FAILED` arrow
+  was added (a failed live run never left `VERIFIED`). No git commit,
+  tag, push, PR, or live action.
+
+## Day 8, Lab 8 — Run the v4 failure-injection evaluation
+
+- **The idea.** Days 5-7 built the deterministic refusals and Day 8
+  Labs 1-7 tested each failure path on its own. This lab packages them
+  into one standalone script, `evals/run_v4_evals.py`, run as `python
+  evals/run_v4_evals.py`. It is the *opposite* of a normal test suite:
+  every check **injects** a bad input - a skipped state, a merged-PR
+  rollback, a risk-raising remediation, a drifted approval, a broken
+  `gh` command, an unapproved repo - and passes only if v4 **refuses**
+  it. Reading the script top to bottom, you watch each attack bounce
+  off; getting "10 of 10 checks held" is the concrete proof that v4
+  fails closed.
+- **What each injection proves.**
+  - *state-skipping is refused* - `transition(PROPOSED, "VERIFIED")`
+    raises; you cannot verify a change no human approved.
+  - *rollback after merge is refused* - `rollback_plan(..., merged=True)`
+    raises; shared history is not rewritten automatically.
+  - *an unapproved repository is refused* - `create_plan("owner/repo",
+    ...)` raises; only the one allowlisted synthetic repo is a valid
+    target.
+  - *a risk-raising remediation is blocked before planning* - a proposal
+    that would give the agent a destructive tool + sensitive data makes
+    `verify().passed` `False`, and `require_verified()` then raises
+    before any `create_plan()`.
+  - *a drifted approval is no longer current* - `approval_is_current` is
+    `True` for the approved `(proposal, source)` hashes and `False` once
+    the source hash changes.
+  - *a broken gh stops the run with no partial continuation* -
+    `subprocess.run` is patched to fail on `git push` (command 4 of 5);
+    `execute_plan(live=True)` raises, exactly 4 commands were attempted,
+    and `gh pr create` (command 5) was never called.
+  - *a dry run never shells out* - `execute_plan(plan)` (no `live=`)
+    returns five `DRY_RUN` rows with the patched `subprocess.run`
+    untouched.
+  - *a failed run is recorded as a terminal state* -
+    `record_terminal_state(tmp_db, VERIFIED, "FAILED", ...)` writes one
+    `workflow_failed` audit row carrying the reason.
+  - *no plan has merge / --force / a non-agentguard push* - the
+    forbidden-token set is absent from every command, and the single
+    `git push` targets an `agentguard/` branch.
+- **Positive controls.** "Fails closed" only means something if the good
+  path still works, so the suite also checks *a valid remediation
+  verifies and reaches a five-command plan* and *a dry run is all
+  DRY_RUN*. If a gate were broken *shut*, these would fail and the eval
+  would not pass.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `evals/run_v4_evals.py` is **mostly happy-path** (workflow reaches
+  VERIFIED, dry-run, draft flag present) with a single stale-approval
+  check, and it needs **`v4_service.py`** (`create_and_verify()`) which
+  is not in this lab's scope and not built. It also calls
+  `create_plan("owner/repo", ...)`, which our Day 7 allowlist-enforcing
+  `create_plan` rejects. Our eval is **failure-focused** to match the
+  lab title, **composes the pieces directly** (no `v4_service`), uses
+  the real allowlisted repo for valid calls, and uses `"owner/repo"`
+  *as* an injection. The starter's *shape* is kept: standalone script,
+  `PASS`/`FAIL` per check, a final `V4 ... EVAL PASS` line, `raise
+  SystemExit` on any failure, a throwaway `tempfile` DB, no network / no
+  real `git` / `gh` / no API money.
+- **New terms:**
+  - **Failure injection** - deliberately feeding a fault or attack to
+    observe how the system responds.
+  - **Negative test / negative scenario** - a check whose success
+    condition is that something is *rejected*.
+  - **Fails closed** - on error or doubt, deny and stop (vs "fails
+    open").
+  - **Positive control** - a check that the good path still works, so a
+    green suite is not just one that blocks everything.
+  - **Eval harness** - a script that runs a batch of checks and reports
+    one overall pass/fail, separate from `pytest`.
+  - **Exit code / `SystemExit`** - the integer a script returns; `0`
+    success, non-zero failure. The eval `raise SystemExit(...)` on any
+    failed check so a CI step can detect it.
+- **Input / processing / output / security boundary.** Input: a
+  synthetic one-agent `ENV`, the allowlisted repo string, and per-check
+  the injected bad value / patched `subprocess.run`. Processing: for
+  each check, compose the relevant v4 pieces, apply the injection,
+  record whether v4 refused. Output: `PASS` / `FAIL` per check, a final
+  summary line, exit 0 or `SystemExit`. Security boundary: the eval
+  **changes no product module** - it only imports and injects against
+  them. Every `subprocess` path is `patch()`-ed (no real `git` / `gh`,
+  no network); the audit DB is a `tempfile.TemporaryDirectory()` file
+  (nothing written into the repo); no token is printed. `scanner.py`
+  untouched and still the sole risk authority.
+- **Verification.** `python evals/run_v4_evals.py` → ten `PASS:` lines,
+  then `V4 FAILURE-INJECTION EVAL PASS: 10 of 10 checks held (fails
+  closed)`, exit 0. `python -m pytest -q` → `800 passed` (unchanged - no
+  new tests; each refusal here already has a Day 3-8 pytest test).
+  `python scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4` (the gate does not run the v4 eval yet); `python -m
+  compileall -q .` is clean; `git status --short` shows only new
+  `evals/run_v4_evals.py` and modified `notes/learning_log.md`; `git
+  branch` shows only `main` and `v4-development`.
+- **Why this lab exists.** A control you have never seen fire is a
+  control you cannot trust. Individual unit tests prove each refusal in
+  isolation; the failure-injection eval assembles them into one readable
+  artifact that an auditor or a new engineer can run in two seconds and
+  see the whole safety story - every attack path, refused - alongside a
+  positive control proving the system still does useful work. It is the
+  Day 8 counterpart to v3's security eval suite.
+- **What this lab did not do.** No product-module change
+  (`workflow.py`, `rollback.py`, `github_plan.py`, `approval.py`,
+  `verifier.py`, `audit_db.py` all untouched). No `v4_service.py`. No
+  new `tests/` file (matches `run_v2_evals.py` / `run_v3_evals.py`). No
+  wiring into `scripts/run_release_gate.py` (Day 10 Lab 1). No real
+  `gh` / `git` / network / API call. No git commit, tag, push, PR, or
+  live action.
+
+## Day 8 Summary — Labs 1 through 8
+
+1. **Understand rollback before and after merge** - log only. Pre-merge
+   rollback (close the draft PR, delete its branch) is cheap and
+   reversible; post-merge undo means a reviewed `git revert` PR, never
+   an automated history rewrite. `DRAFT_PR_CREATED -> ROLLED_BACK` is
+   the only arrow out of `DRAFT_PR_CREATED`.
+2. **Create the pre-merge rollback command plan** - new `rollback.py`;
+   `rollback_plan(repository, pr_number, branch)` returns the two
+   commands (`gh pr close`, `git push origin --delete`) as reviewable
+   token-lists, validated against the Day 7 allowlist, running nothing.
+3. **Refuse automatic rollback after merge** - `rollback_plan` gains a
+   required keyword-only `merged: bool`; `merged=True` raises "Automatic
+   rollback is refused after merge. Use a reviewed revert workflow." and
+   produces no command; `merged` is type-checked (no fail-open default).
+4. **Record rejected / failed / rolled-back terminal states** -
+   `workflow.record_terminal_state(db, current, terminal_state, *,
+   reason, details=None)`: `transition()` + one append-only audit row
+   (`workflow_rejected` / `workflow_failed` / `workflow_rolled_back`), so
+   a workflow that ends without succeeding is recorded, not dropped.
+   `transition()` stays pure.
+5. **Simulate verification failure** - `verifier.require_verified(result)`:
+   return the result if it passed, else `raise ValueError` naming every
+   failed check. A failed `VerificationResult` can no longer reach
+   `create_plan()`; the failed-check names travel into the audit payload.
+6. **Simulate stale approval** - `approval.approval_is_current(record,
+   proposal_sha256, source_sha256) -> bool`, the non-raising companion
+   to `validate_approval()`. A drift in either hash makes it `False`;
+   the workflow fails closed and a fresh `decide()` against the new
+   hashes (a new human review) is the only way forward.
+7. **Simulate GitHub authentication and command failure** - scenario
+   tests only. `execute_plan(live=True)`'s `check=True` loop already
+   fails fast; the tests inject a `gh` 401 / a `git push` failure and
+   prove the error is surfaced, no command after it runs, and the
+   workflow is recorded `VERIFIED -> FAILED`. Rollback execution stays
+   manual (starter parity).
+8. **Run the v4 failure-injection evaluation** - new
+   `evals/run_v4_evals.py`: 9 injections + 1 positive control, each
+   passing only if v4 refuses. `python evals/run_v4_evals.py` →
+   `V4 FAILURE-INJECTION EVAL PASS: 10 of 10 checks held (fails closed)`.
+
+**Where Day 8 leaves off:** the rollback + failure-path layer is
+complete. `rollback.py` (`rollback_plan`, pure, allowlist-validated,
+refuses `merged=True`); `workflow.record_terminal_state`;
+`verifier.require_verified`; `approval.approval_is_current`; and
+`evals/run_v4_evals.py` (10-check failure-injection eval). The suite is
+at **800 passed** (684 at the end of Day 7 → +116 across Day 8);
+`python scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+AgentGuard v4`; `git branch` is still only `main` + `v4-development`.
+Everything since the Day 1 baseline commit `517db77` is uncommitted on
+`v4-development`. Still to come: **`v4_service.py`** (the orchestrator
+that chains transition → record_event → build_proposal → hash → decide →
+validate_approval → verify → require_verified → create_plan, and calls
+`record_terminal_state` on every failure) is not built - Day 9's
+Streamlit app and, if it wants a fuller eval, Day 10 will need it; the
+v4 eval is not yet wired into the release gate (Day 10 Lab 1);
+`docs/v4_state_machine.md` / `docs/v4_architecture.md` do not yet
+mention `record_terminal_state` / `require_verified` / `approval_is_current`
+(Day 10 Lab 5); `.agentguard/pr_body.md` is still never written; and no
+live `gh` / `git` action has been performed. Day 9 builds the v4
+Streamlit app and the Docker packaging.
+
+## Day 9, Lab 1 — Map the v4 Streamlit user journey
+
+- **The idea.** `app_v4.py` so far is the Day 2 slice: a safety-boundary
+  list and a `gh auth status` panel. Day 9 turns it into the page that
+  walks a person through the whole governed remediation. This lab is the
+  **map**, not the machinery: a new read-only section, "The v4
+  remediation journey", that shows the six stages **in order** and -
+  the point of the map - **who holds authority at each one**. A viewer
+  reads the page top to bottom and understands the flow before any
+  button exists. The controls that walk through the stages arrive in
+  Labs 2-4.
+- **The six stages (`JOURNEY_STAGES`).**
+  1. **Discovery** - load the synthetic inventory (read-only) and scan
+     it. Produces the agent list + a SHA-256 of the exact source + v1's
+     findings. *Authority:* read-only; `scanner.py` is the sole risk-score
+     authority.
+  2. **Proposal** - pick one agent + one of three allowlisted templates.
+     Produces a bounded `RemediationProposal` + its SHA-256. *Authority:*
+     deterministic templates only, never a free-form AI patch; the AI
+     layer may explain or propose, never apply or score.
+  3. **Approval** - a named human enters a reason and records
+     APPROVE/REJECT. Produces an `ApprovalRecord` bound to the proposal
+     hash **and** the source hash. *Authority:* the human approves
+     intent; no real config touched; a REJECT ends the workflow
+     (recorded, not dropped).
+  4. **Verification** - apply the approved change to a throwaway copy and
+     re-scan. Produces a `VerificationResult`. *Authority:* software
+     checks correctness; `require_verified()` blocks a failed result
+     before any GitHub step; fail closed -> `FAILED`.
+  5. **Plan** - show the exact `git`/`gh` commands. Produces a
+     `GitHubPlan` - five commands, dry-run by default. *Authority:* draft
+     PR only, one allowlisted demo repo, no merge / `--force` / `main`
+     push; a live run needs a separate explicit opt-in.
+  6. **Audit** - list every step in order. Produces append-only rows in
+     the SQLite `workflow_events` table. *Authority:* immutable by
+     convention; a rejection/failure/rollback is a recorded terminal
+     event - the trail is never silent.
+- **How it maps to `workflow.STATES`.** Each stage carries a `state`
+  token that is a real member of `workflow.STATES`, so a test
+  cross-checks the map against the state machine and it cannot drift.
+  The six tokens are `DISCOVERED, PROPOSED, APPROVED, VERIFIED,
+  DRAFT_PR_CREATED, ROLLED_BACK` - the state machine's `SCANNED` is
+  folded into the Discovery stage (one thing the user sees), and the
+  three error/terminal states (`REJECTED`, `FAILED`, `ROLLED_BACK`) are
+  described in the stage text rather than given their own stages -
+  they are *how a stage can end*, not steps of their own.
+- **Why a map before the controls.** Building the buttons first invites
+  a UI where the safety story is implicit - you'd have to click through
+  to discover that approval is bound to a hash, or that the plan is
+  dry-run. Stating the six stages and their authority up front makes the
+  governance the *first* thing a reviewer reads, and gives Labs 2-4 a
+  fixed skeleton to hang controls on.
+- **New terms:**
+  - **User journey** - the ordered sequence of steps a person takes
+    through a product to accomplish one task.
+  - **Streamlit page / widget** - Streamlit renders a Python script
+    top-to-bottom into a web page; each `st.*` call (`st.subheader`,
+    `st.markdown`, later `st.selectbox`, `st.button`) is a widget.
+  - **Read-only vs interactive view** - this lab's section only
+    *describes*; a later view will have inputs and a button that change
+    `st.session_state`.
+  - **Trust boundary per stage** - the point in the journey where the
+    system's authority to act increases, and the named check that gates
+    it.
+  - **Map before build** - writing the ordered outline (and its
+    invariants) before the implementing code, so the structure is
+    reviewable first.
+- **Input / processing / output / security boundary.** Input: none - the
+  map is a static module constant. Processing: `render()` iterates
+  `JOURNEY_STAGES` and emits one `st.markdown` block per stage.
+  Output: the "The v4 remediation journey" section on the page (six
+  numbered stages). Security boundary: `app_v4.py` imports **no**
+  workflow module and no `v4_service`; `render()` still runs only under
+  the `__main__` guard, so `import app_v4` (the tests) has no side
+  effects - no Streamlit context, no subprocess. The auth panel still
+  strips any `Token:` line. `scanner.py` untouched and still the sole
+  risk authority - the map only *names* that boundary.
+- **Verification.** `python -c "import app_v4; print(len(app_v4.JOURNEY_STAGES))"`
+  → `6`, no Streamlit warning. `python -m pytest -q tests/test_app_v4.py`
+  → `11 passed` (+6: six stages in order, all fields filled, each
+  `state` is a real `workflow.STATES` token, the authority invariants
+  are stated, `render()` iterates the stages, no workflow-engine import
+  yet). Full suite → `806 passed` (up from `800`, no regression).
+  `python scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean. `streamlit run
+  app_v4.py` boots with no exception and serves HTTP 200; the page shows
+  the "The v4 remediation journey" section with the six stages in order.
+  `git status --short` shows only modified `app_v4.py`,
+  `tests/test_app_v4.py`, `notes/learning_log.md`; `git branch` shows
+  only `main` and `v4-development`.
+- **Why this lab exists.** A governed workflow is only as trustworthy as
+  a reviewer's ability to see the governance. Putting the six stages and
+  their per-stage authority on the page in order - before the first
+  input widget - means the safety model is the thing you read first, not
+  something you infer by clicking. It also fixes the order Labs 2-4 must
+  follow: discovery, then proposal, then approval, then verification,
+  then plan, then audit - no shortcuts.
+- **What this lab did not do.** No workflow-module imports in `app_v4.py`
+  (no `v4_service`, `remediation_templates`, `verifier`, `github_plan`).
+  No input widgets or buttons (Labs 2-4). No `Dockerfile` /
+  `.dockerignore` / `compose.yaml` (Day 9 Lab 6). No
+  `.github/workflows/tests.yml` change (Day 9 Lab 8). No git commit,
+  tag, push, PR, or live action.
+
+## Day 9, Lab 2 — App v4 input and proposal controls
+
+- **The idea.** Lab 1 put the six-stage map on the page. This lab makes
+  stages 1-2 (Discovery -> Proposal) clickable: an **agent** selectbox,
+  a **template** selectbox, one **owner** text box (only for
+  `ASSIGN_OWNER`), and a **Build proposal** button. Clicking it turns
+  the two selections into a `RemediationProposal` and shows it plus its
+  SHA-256 and the source SHA-256. Nothing is applied - the proposal is a
+  *description* of one bounded change.
+- **The two controls + the one validated input.**
+  - `st.selectbox("Agent", [a["agent_name"] for a in
+    environment["agents"]])` - the user can only pick an agent that
+    exists in the synthetic connected-demo inventory; there is no way to
+    type an arbitrary target.
+  - `st.selectbox("Remediation template", list(TEMPLATE_INFO))` - the
+    choices are the three allowlisted template ids, **sourced from
+    `remediation_templates.TEMPLATE_INFO`** rather than a hardcoded list,
+    so the dropdown can never drift from the allowlist. The
+    `rationale` and `addresses` fields are shown as a caption so the
+    reviewer sees what the template does and which v1 finding it clears.
+  - `st.text_input("Owner to assign", "")` - shown **only** when
+    `TEMPLATE_INFO[template_id].needs_input == "owner"`. It is the one
+    free-text value, and it is validated by
+    `remediation_templates._validate_owner` (via `build_proposal`):
+    non-empty, <=200 chars, single line.
+- **`build_ui_proposal(environment, agent_name, template_id,
+  owner_value=None)` line by line.**
+  - `require_allowlisted(template_id)` - gate the *intent* before an
+    agent is even looked up. A bad template id is refused here, not
+    somewhere deeper.
+  - `matches = [a for a in environment["agents"] if a["agent_name"] ==
+    agent_name]; if len(matches) != 1: raise ValueError(...)` - exactly
+    one agent must match. Zero (renamed / wrong env) and two (ambiguous)
+    are both errors.
+  - `source_sha256 = sha256_value(environment)` - the SHA-256 of the
+    exact inventory the proposal is built against. A later approval binds
+    to this (Day 4 / Day 9 Lab 3).
+  - `proposal = build_proposal(template_id, matches[0], source_sha256,
+    value=owner_value)` - the existing deterministic builder does the
+    template-specific field change (`{"human_approval_required": True}`
+    / `{"owner": <validated>}` / `{"tools": <filtered>}`).
+  - returns `{"proposal": proposal.to_dict(), "proposal_sha256":
+    sha256_value(proposal.to_dict()), "source_sha256": source_sha256}`.
+  It is pure - the `environment` dict is never mutated (a test
+  deep-compares before/after).
+- **In `render()`** the button stores the result in
+  `st.session_state["v4_proposal"]` so Day 9 Labs 3-4 can pick it up; a
+  `ValueError` is caught and shown with `st.error`, and the stale
+  proposal is cleared (`st.session_state.pop`). When a proposal exists it
+  is rendered with `st.json` plus the two hashes.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `app_v4.py` does the whole flow in one button
+  (`v4_service.create_and_verify` -> result + plan + audit) and passes a
+  **hardcoded** template list. Lab 2 is proposal-only: no `v4_service`
+  (not built), no approval / verify / plan / audit widgets, and the
+  template list comes from `TEMPLATE_INFO`. The selection->proposal logic
+  is extracted into the pure `build_ui_proposal` so it is testable
+  without a Streamlit runtime (the starter buries it in `v4_service`).
+- **Why the proposal is shown but not applied.** A proposal is a claim
+  about what *would* change. Showing it - with its hash - lets a reviewer
+  read the exact `field_changes` and the target before anyone approves
+  anything. Applying it (to a throwaway copy, for verification) is a
+  separate step that only runs *after* approval, in Lab 3-4. Keeping
+  "describe" and "apply" apart in the UI mirrors the workflow's own
+  `PROPOSED` vs `VERIFIED` states.
+- **New terms:**
+  - **`st.selectbox` / `st.text_input` / `st.button`** - Streamlit input
+    widgets; each returns the current value on every script rerun.
+  - **`st.session_state`** - a per-session dict that survives reruns, so
+    a value built on a button click is still there on the next
+    interaction.
+  - **Bounded input vs free text** - the agent and template are chosen
+    from fixed lists (bounded); the owner name is free text and is
+    therefore validated before use.
+  - **Describe, not apply** - the proposal states a change without making
+    it; applying it is a later, gated step.
+  - **Source hash vs proposal hash** - `source_sha256` fingerprints the
+    inventory the proposal was built against; `proposal_sha256`
+    fingerprints the proposal itself. An approval will bind to both.
+- **Input / processing / output / security boundary.** Input: the agent
+  name and template id (both from fixed lists) and, for `ASSIGN_OWNER`,
+  one owner string. Processing: `require_allowlisted` -> match exactly
+  one agent -> `sha256_value(environment)` -> `build_proposal` ->
+  `to_dict` + hash. Output: a `{proposal, proposal_sha256,
+  source_sha256}` dict shown with `st.json`; on any bad input, a
+  `ValueError` shown with `st.error`. Security boundary: `app_v4.py` now
+  imports `remediation_templates` + `proposal_hash` only (still no
+  `v4_service` / `verifier` / `github_plan` / `audit_db`); `render()`
+  still runs only under `__main__`; `import app_v4` has no side effects;
+  the connected-demo inventory is read, never written. `scanner.py`
+  untouched - the proposal predicts nothing about the risk score and
+  sets nothing.
+- **Verification.** `git status --short` (the lab's own command) shows
+  only modified `app_v4.py`, `tests/test_app_v4.py`,
+  `notes/learning_log.md`. `python -c "import app_v4; ...build_ui_proposal(...)"`
+  prints a 64-hex proposal hash with no Streamlit warning. `python -m
+  pytest -q tests/test_app_v4.py` -> `26 passed` (+15: the three
+  template scenarios, owner validation, unallowlisted template, missing
+  agent, determinism, describe-not-apply, and the render wiring). Full
+  suite -> `821 passed` (up from `806`, no regression). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean; `streamlit run
+  app_v4.py` boots with no exception and serves HTTP 200; `git branch`
+  shows only `main` and `v4-development`.
+- **Why this lab exists.** The riskiest part of a remediation UI is the
+  input: if the page let a user type a target or a change freehand, the
+  allowlist would only be as good as the person using it. By making the
+  agent and the template *choices from closed lists*, and the single
+  free-text field a validated 200-char owner name, the page cannot
+  express a remediation that the deterministic layer would not allow -
+  the UI inherits the same boundary as the code behind it.
+- **What this lab did not do.** No `apply_proposal_to_environment`, no
+  verification, no approval, no GitHub plan, no audit rows (Day 9 Labs
+  3-4). No `v4_service.py`. No `Dockerfile` / `.dockerignore` /
+  `compose.yaml` (Day 9 Lab 6). No `.github/workflows/tests.yml` change
+  (Day 9 Lab 8). No git commit, tag, push, PR, or live action.
+
+## Day 9, Lab 3 — Display hashes, approval, verification, and events
+
+- **The idea.** Lab 2 built and showed a proposal. This lab takes the
+  page through journey stages 3-4 - enter a reviewer + a reason, choose
+  APPROVE / REJECT, click one **Approve & verify** button - and makes
+  the **normally-invisible control evidence visible**: the two content
+  hashes the approval is bound to, the full `ApprovalRecord`, the
+  `VerificationResult` checklist with the before/after HIGH counts, and
+  an ordered **event timeline**. A reviewer does not have to trust that
+  a hash was checked or that verification ran; they see the hash, the
+  bound approval, and the checklist on the page.
+- **What the page now shows.**
+  - *Content hashes* - `proposal SHA-256` and `source SHA-256` in an
+    `st.code` block, verbatim (full 64 hex, so they are verifiable).
+  - *Approval record* - `record.to_dict()` via `st.json`, plus a caption
+    stating it is "bound to this exact proposal + source" and whether it
+    is "still current". The record's own `proposal_sha256` /
+    `source_sha256` fields are the *same strings* shown in the hashes
+    block - a test asserts that equality, so the binding is not just
+    claimed, it is visibly the same value.
+  - *Verification* - `result.summary()` (the `[x]` / `[ ]` checklist)
+    via `st.text`, plus "HIGH-risk agents: before N -> after M".
+  - *Event timeline* - each step as `` `STATE` - **event_name** `` with
+    its `detail` dict. Three steps on the happy path
+    (`PROPOSED -> APPROVED -> VERIFIED`), two on a REJECT
+    (`PROPOSED -> REJECTED`).
+- **`approve_and_verify(...)` line by line.**
+  - `workflow_id = uuid.uuid4().hex[:12]` - a fresh id per run.
+  - `_proposal_from_selection(...)` - the refactored Lab 2 core: gate the
+    template, match exactly one agent, hash the source, `build_proposal`.
+    Returns the `RemediationProposal` *object* (Lab 2's `build_ui_proposal`
+    now wraps this and still returns the same dict).
+  - `record = decide(workflow_id, proposal_sha256, source_sha256,
+    reviewer, decision, reason)` - `decide()` raises `ValueError` for a
+    decision that is not exactly `APPROVE` / `REJECT`, or a blank
+    reviewer / reason. Those are **input errors** and propagate.
+  - REJECT branch: append a `proposal_rejected` event, return with
+    `verification=None`, `final_state="REJECTED"`. No verification runs
+    on a rejected proposal.
+  - APPROVE branch: `approval_is_current(record, proposal_sha256,
+    source_sha256)` re-checks the binding (always `True` here - the
+    decision was made against the hashes we just computed - but the
+    check is shown); append `proposal_approved`.
+  - `result = verify(environment, proposal)` - the Day 6 verifier, on an
+    isolated deep copy. `try: require_verified(result)` - the gate;
+    a `ValueError` here means the verification **failed**, which is an
+    **outcome**, caught and turned into `final_state="FAILED"` +
+    a `verification_failed` event, not re-raised.
+  - Returns a flat dict of everything the page displays.
+- **Input error vs reported outcome.** A malformed *input* -
+  unallowlisted template, no matching agent, bad owner, a decision string
+  that is not exactly `APPROVE`/`REJECT`, a blank reviewer/reason - is a
+  `ValueError` the page shows as `st.error` and builds nothing. A REJECT
+  decision and a failed verification are *results the user asked to
+  see*: they come back in the dict and the timeline, with `final_state`
+  `REJECTED` / `FAILED`. The page's job is to *display* those, not hide
+  them behind an exception.
+- **In-memory events vs the SQLite trail.** The timeline is assembled in
+  Python from the steps just performed; it is **not** written to
+  `audit_db`'s `workflow_events` table. That keeps this lab inside its
+  stated file scope (no `audit_db` / `workflow` import) and is enough to
+  *show* the sequence. The durable, append-only SQLite trail is wired
+  through `v4_service` on Day 10 - the timeline dicts already use the
+  same `{step, name, state, detail}` shape so that swap is mechanical.
+- **Deviation from the starter (compared, not copied).** The starter
+  runs everything through `v4_service.create_and_verify(...)` and dumps
+  `st.json(result)` / `st.json(list_events(DB_PATH, ...))`. We have no
+  `v4_service`; `approve_and_verify` composes `build_proposal` ->
+  `decide` -> `verify` directly as a pure helper, the events are
+  in-memory, and the display is legible (hash block, checklist,
+  numbered timeline) rather than a raw JSON dump.
+- **New terms:**
+  - **Control evidence** - the artefacts that prove a governance step
+    happened: a content hash, an `ApprovalRecord`, a `VerificationResult`.
+  - **Content binding / bound hash** - an approval stores the SHA-256 of
+    the exact proposal and source it was granted for; validity requires
+    both to still match.
+  - **`st.radio` / `st.text_area`** - Streamlit widgets for a
+    single-choice control and a multi-line text box.
+  - **Event timeline** - an ordered, human-readable list of what the
+    workflow did, each entry a state + an event name + detail.
+  - **Outcome vs error** - a rejection or a failed check is a valid
+    result to display; a malformed input is an exception.
+  - **`uuid` workflow id** - a random 12-hex identifier tying one run's
+    events together.
+- **Input / processing / output / security boundary.** Input: the Lab 2
+  selection (agent, template, optional owner) plus a reviewer name, a
+  reason, and an APPROVE/REJECT choice. Processing: `_proposal_from_selection`
+  -> `decide` -> (APPROVE) `verify` + `require_verified`; build the event
+  list. Output: a flat display dict (`st.code` for the hashes, `st.json`
+  for the approval, `st.text` for the verification summary, a markdown
+  loop for the timeline); a `ValueError` shown as `st.error` on bad
+  input. Security boundary: `approval.py` / `proposal_hash.py` /
+  `verifier.py` are **unchanged** - the lab only wires their existing
+  APIs into the page. `app_v4.py` now imports `approval` + `verifier`
+  (plus the Lab 2 modules); still no `github_plan` / `v4_service` /
+  `audit_db`. `render()` still `__main__`-guarded; `import app_v4` has no
+  side effects. `verify` runs on a deep copy in a `tempfile` directory it
+  deletes; the connected-demo inventory is read, never written.
+  `scanner.py` untouched and still the sole risk authority.
+- **Verification.** `python -m pytest -q tests/test_approval.py
+  tests/test_proposal_hash.py tests/test_verifier.py` (the lab's command)
+  -> unchanged, all pass - the regression gate: wiring these modules into
+  the app broke nothing. `python -m pytest -q tests/test_app_v4.py` ->
+  `41 passed` (+15: the APPROVE / REJECT / failed-verification paths, the
+  visible hash binding, input-raises-vs-outcome-reported, no-mutation,
+  fresh-workflow-id, and the render wiring). `python -c "import app_v4;
+  ...approve_and_verify(...)"` prints
+  `VERIFIED True ['PROPOSED', 'APPROVED', 'VERIFIED']`. Full suite ->
+  `836 passed` (up from `821`, no regression). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4`; `python -m compileall -q .` is clean; `streamlit run
+  app_v4.py` boots with no exception and serves HTTP 200. `git status
+  --short` shows only modified `app_v4.py`, `tests/test_app_v4.py`,
+  `notes/learning_log.md`; `git branch` shows only `main` and
+  `v4-development`.
+- **Why this lab exists.** The security value of hashing an approval, or
+  verifying a change in isolation, is zero if a reviewer cannot see that
+  it happened. This lab turns each control into on-screen evidence: the
+  exact hash the approval is bound to (shown as the same string in two
+  places, so it is checkable), the approval record with who/why/when, the
+  verification checklist with the risk-count delta, and the ordered
+  sequence of states. It is the difference between "trust us, the
+  workflow is governed" and "here is the governance, read it".
+- **What this lab did not do.** No change to `approval.py` /
+  `proposal_hash.py` / `verifier.py` - a pure display lab. No `audit_db`
+  / SQLite persistence (the timeline is in-memory; the durable trail is
+  Day 10 via `v4_service`). No `v4_service.py`. No GitHub dry-run plan
+  (Day 9 Lab 4). No `Dockerfile` / `.dockerignore` / `compose.yaml`
+  (Day 9 Lab 6). No `.github/workflows/tests.yml` change (Day 9 Lab 8).
+  No git commit, tag, push, PR, or live action.
+
+## Day 9, Lab 4 — Display the GitHub dry-run plan and safety warnings
+
+- **The idea.** For a run that reached `VERIFIED` (and only then), the
+  page now shows journey stage 5: the exact five `git` / `gh` commands a
+  live run *would* execute, their current `DRY_RUN` status, and a
+  prominent list of the safety guarantees. The page is a **review
+  surface, not a trigger** - it runs none of the commands. A person
+  reads the five literal commands here so that if they later run the
+  live action from the command line (Day 10 Lab 3), there is nothing
+  they did not already see.
+- **What the page shows (gated on `VERIFIED`).**
+  - a headline `st.warning`: "Review these commands. This page runs none
+    of them.";
+  - the five `GITHUB_SAFETY_WARNINGS` as bullets: dry-run by default,
+    the PR would be a **draft** (cannot auto-merge), no command merges /
+    force-pushes / resets / touches `main` (the only `git push` targets
+    the `agentguard/` branch), the target is the private synthetic demo
+    repo only, and live execution is a separate command-line opt-in this
+    page can never run;
+  - the repository / branch / file line;
+  - the five commands, each numbered on its own line
+    (`git checkout -b agentguard/<id>` -> `git add <file>` ->
+    `git commit -m <title>` -> `git push -u origin <branch>` ->
+    `gh pr create --draft ...`);
+  - the dry-run rows - `{"command": [...], "status": "DRY_RUN"}` x5.
+  A `REJECTED` / `FAILED` run gets a one-line "No GitHub plan:
+  verification did not pass" note instead.
+- **`github_dry_run_plan(workflow_id)` line by line.**
+  - `plan = create_plan(DEMO_REPO, workflow_id)` - the Day 7 builder.
+    `DEMO_REPO` is the exact allowlisted repo string; `create_plan`
+    validates it, the file path, and (via `branch_name`) the workflow
+    id, so a bad id raises `ValueError` here.
+  - returns the plan's `repository` / `branch` / `file_path` / `title`,
+    `commands` as plain lists (`[list(c) for c in plan.commands]`),
+    `execute_plan(plan, live=False)` for the dry-run rows, and
+    `GITHUB_SAFETY_WARNINGS`.
+  - `execute_plan(plan, live=False)` is the **only** execution call the
+    page ever makes - it formats the commands and touches no subprocess.
+    A test monkeypatches `github_plan.subprocess.run` to raise and
+    confirms `github_dry_run_plan` still returns.
+- **Gated on `VERIFIED` - why.** The state machine's only arrow to a
+  draft PR is `VERIFIED -> DRAFT_PR_CREATED`. A change that was rejected
+  or failed verification has no business producing a GitHub plan, so the
+  page does not build one - it says why instead.
+- **No live button.** There is no widget anywhere on the page that runs
+  a `git` / `gh` command. Live execution is deliberately a separate,
+  explicit command-line step (Day 10 Lab 3), so enabling it is an
+  action a person takes knowingly, not a button they might click by
+  reflex. A test asserts the render source contains no `live=True`.
+- **Deviation from the starter (compared, not copied).** The starter
+  does `create_plan("YOUR_GITHUB_USERNAME/agentguard-remediation-demo",
+  ...)` (a placeholder our allowlist-enforcing `create_plan` rejects)
+  and `st.json(execute_plan(plan, live=False))` - a raw dump, no
+  warnings, no outcome gate. Ours uses the real allowlisted repo, gates
+  on `final_state == "VERIFIED"`, shows the warnings first and the
+  commands legibly, and has no PR-body preview (`render_pr_body` needs a
+  `predicted_score` field we do not compute - deferred).
+- **New terms:**
+  - **Dry run** - producing and showing the exact commands without
+    executing them.
+  - **Review surface vs trigger** - a screen that lets you *inspect* an
+    action, versus a control that *starts* it. This page is the former.
+  - **Opt-in / explicit consent** - a dangerous capability is off by
+    default and turned on only by a deliberate, separate act.
+  - **Draft pull request** - a PR marked not-ready; GitHub disables its
+    merge button until a human clicks "Ready for review".
+  - **Forbidden-token guarantee** - a property (tested) that a set of
+    dangerous tokens (`merge`, `--force`, `reset`, ...) never appears in
+    any produced command.
+- **Input / processing / output / security boundary.** Input: the
+  `workflow_id` of a `VERIFIED` run. Processing: `create_plan` (validates
+  repo / file / id) -> `execute_plan(live=False)` (formats, runs
+  nothing). Output: a dict of the plan fields + the dry-run rows + the
+  warnings, rendered as a warning banner, a bullet list, and numbered
+  command lines. Security boundary: `github_plan.py` is **unchanged** -
+  the lab wires its existing functions in for display. `app_v4.py` now
+  imports `github_plan` (plus the Lab 2-3 modules); still no
+  `v4_service` / `audit_db`. The page makes **no** live `git` / `gh` /
+  network call; `execute_plan` is only ever `live=False`; `git branch`
+  is unchanged after loading the page. `render()` still `__main__`-
+  guarded; `import app_v4` side-effect free. `scanner.py` untouched.
+- **Verification.** `streamlit run app_v4.py` (the lab's command) boots
+  with no exception and serves HTTP 200; after approving + verifying a
+  remediation the "GitHub dry-run plan" section shows the warning
+  banner, the five guarantees, and the five commands each `DRY_RUN`.
+  `python -c "import app_v4, json; ...github_dry_run_plan('abc123def456')..."`
+  prints the five command token-lists. `python -m pytest -q
+  tests/test_app_v4.py` -> `54 passed` (+13: the warnings tuple, the
+  plan shape / target, the five-command / draft-PR shape, the
+  forbidden-token sweep, the all-DRY_RUN check, the no-subprocess check,
+  branch-safe-id validation, the verified-run-to-plan path, and the
+  render gate + no-live-execution check). Full suite -> `849 passed` (up
+  from `836`, no regression). `python scripts/run_release_gate.py` still
+  ends `RELEASE GATE PASS for AgentGuard v4`; `python -m compileall -q .`
+  is clean; `git status --short` shows only modified `app_v4.py`,
+  `tests/test_app_v4.py`, `notes/learning_log.md`; `git branch` shows
+  only `main` and `v4-development`.
+- **Why this lab exists.** The moment before an automated system takes an
+  outward action is the moment a human most needs full, literal
+  visibility into what that action is. Rendering the five exact commands
+  - not a summary, not "it will open a PR", but the token lists - and
+  showing them only in dry-run, with the guarantees spelled out, is what
+  lets a reviewer sign off on the *action* with the same confidence they
+  signed off on the *intent*. Enabling the live run stays a separate,
+  deliberate step so consent is never implied by simply viewing the
+  plan.
+- **What this lab did not do.** No live execution and no button that
+  could start one. No `.agentguard/pr_body.md` write and no PR-body
+  preview. No `github_plan.py` change. No `v4_service` / `audit_db`. No
+  `Dockerfile` / `.dockerignore` / `compose.yaml` (Day 9 Lab 6). No
+  `.github/workflows/tests.yml` change (Day 9 Lab 8). No git commit,
+  tag, push, PR, or live action.
+
+## Day 9, Lab 5 — Install Docker Desktop and verify docker commands
+
+- **The idea.** AgentGuard v4 currently runs from a local `.venv` with
+  Python 3.14 and the exact pins in `requirements.txt`. That works on
+  *this* machine. A **container** packages the same base OS, the same
+  Python, and the same installed dependencies into one image, so the app
+  runs identically on another laptop, a server, or a CI runner - "works
+  on my machine" becomes "works everywhere". This lab installs the tool
+  that builds and runs containers (Docker Desktop) and verifies it; the
+  actual `Dockerfile` / `compose.yaml` are Day 9 Lab 6.
+- **New terms:**
+  - **Image** - a read-only, layered filesystem snapshot: a base
+    (`python:3.12-slim` = minimal Debian + Python), plus the pip
+    dependencies, plus the app code. Built from a `Dockerfile`.
+  - **`Dockerfile`** - the plain-text build recipe (`FROM`, `COPY`, `RUN
+    pip install`, `CMD`). Built Day 9 Lab 6.
+  - **Layer** - each `Dockerfile` line produces a cached layer, so a
+    rebuild after only a code change is fast.
+  - **Container** - a running instance of an image, isolated from the
+    host.
+  - **Docker daemon (`dockerd`)** - the background service that builds
+    images and runs containers; on macOS it runs inside a small Linux VM
+    (`docker info` shows `Kernel Version: 7.0.12-linuxkit`, `Operating
+    System: Docker Desktop`).
+  - **Docker Desktop** - the Mac app bundling the daemon, the `docker`
+    CLI, and the `compose` plugin.
+  - **`docker compose` (v2 plugin)** - runs multi-container setups from a
+    `compose.yaml`; the modern form is the `compose` CLI plugin
+    (`~/.docker/cli-plugins/docker-compose`), not the old standalone
+    `docker-compose`.
+  - **Registry / Docker Hub** - where images are published and pulled
+    from (the `python:3.12-slim` base comes from Docker Hub). This lab
+    pushes nothing.
+  - **`-slim` base image** - a stripped base (no compilers, no docs) -
+    smaller download and smaller attack surface.
+  - **"Works on my machine"** - the class of bug a container eliminates:
+    an app that runs for the author but not for anyone else because of a
+    version or dependency difference.
+- **Machine-wide action, flagged.** Same note as `brew install gh` (Day 2
+  Lab 2) and `brew install node` (v3): installing Docker Desktop reaches
+  outside `agentguard-v4` onto the whole machine (a ~1.5 GB app, a
+  background daemon, a Linux VM). `CLAUDE.md` requires approval for
+  installs; approval was given; **the user ran the install and started
+  Docker Desktop - I did not**. I ran only the read-only verify commands.
+- **Before / after.**
+  | | Before (Lab 4) | After (Lab 5) |
+  |---|---|---|
+  | `docker --version` | `command not found` | `Docker version 29.7.2, build a7dcaa6` |
+  | `docker compose version` | `command not found` | `Docker Compose version v5.4.0` |
+  | `which docker` | (nothing) | `/usr/local/bin/docker` |
+  | `docker info` | `command not found` | Client + Server sections; `Server Version: 29.7.2`; `OSType: linux`; `Architecture: aarch64`; `CPUs: 18`; `Total Memory: 7.746GiB`; `Containers: 0`; `Images: 0`; no "Cannot connect to the Docker daemon" - the daemon is up |
+- **Input / processing / output / security boundary.** Input: the lab's
+  three verify commands. Processing: the `docker` CLI queried the local
+  daemon and printed version + system info; nothing was built and no
+  container ran. Output: `docker` runnable on PATH with a healthy daemon,
+  plus this entry. Security boundary: a real machine-wide install
+  (performed by the user), but scoped to one vetted app - no `sudo` from
+  me, no image built, no image pulled or pushed, no container run, no
+  registry auth, no cost, **no project code changed**, no `.env` touched,
+  no git commit. Nothing Docker-related is in the repo yet.
+- **What was inspected but not changed.** `.gitignore` - still adequate;
+  the build-context exclusions (`.venv`, `.git`, `data`, `.env`,
+  `__pycache__`) will live in the `.dockerignore` created in Lab 6, not
+  `.gitignore`. `app_v4.py` - unchanged; the container will run it as-is.
+  `.github/workflows/tests.yml` - unchanged (Day 9 Lab 8 adds the
+  container/CI step). Regression: `python -m pytest -q` still `849
+  passed`; `python scripts/run_release_gate.py` still ends `RELEASE GATE
+  PASS for AgentGuard v4`.
+- **Note carried to Lab 6.** The starter `Dockerfile` pins
+  `FROM python:3.12-slim` while this repo's venv is Python 3.14 - Lab 6
+  reconciles that (bump the base image, or accept 3.12 for the container
+  and document why).
+- **Why this lab exists.** Every later packaging lab (Lab 6 builds the
+  image, Lab 7 runs it, Lab 8 puts it in CI) needs a working Docker on
+  the machine. Installing it and checking only the versions and daemon
+  health - in isolation, before any `Dockerfile` exists - keeps that
+  external dependency explicit and verifiable, exactly as Day 2 Lab 2 did
+  for `gh`.
+- **What this lab did not do.** No `Dockerfile` / `.dockerignore` /
+  `compose.yaml` (Day 9 Lab 6). No image built and no container run
+  (Day 9 Lab 7). No `docker pull` / `docker push` / registry login. No
+  `.github/workflows/tests.yml` change (Day 9 Lab 8). No `sudo`, no
+  secret, no project code change, no git commit, tag, push, PR, or live
+  action.
+
+## Day 9, Lab 6 — Create Dockerfile, .dockerignore, and compose.yaml
+
+- **The idea.** Three files turn the v4 Streamlit app into a
+  **reproducible local service**: a `Dockerfile` (the image recipe), a
+  `.dockerignore` (what stays out of the image), and a `compose.yaml`
+  (`docker compose up` -> the app on `http://localhost:8501`). Two
+  properties matter for the learning goal, "reproducible ... without
+  secrets": the image pins the *same* Python (3.14, matching the venv)
+  and the *same* `requirements.txt`, so it runs identically on any
+  machine and in CI; and no credential ever enters the image or the
+  committed compose file.
+- **`Dockerfile` line by line.**
+  - `FROM python:3.14-slim` - the base image: minimal Debian + Python
+    3.14, no compilers or docs. Matches the local venv (`python
+    --version` -> `3.14.6`). "Reproducible" means the container's Python
+    is the one we develop against.
+  - `WORKDIR /app` - all app files live here.
+  - `COPY requirements.txt ./` then `RUN pip install --no-cache-dir -r
+    requirements.txt` **before** `COPY . .` - the layer-cache trick.
+    Docker caches each instruction as a filesystem layer; because the
+    (slow) `pip install` line only depends on `requirements.txt`, editing
+    app code re-uses that layer instead of re-installing streamlit &c.
+  - `COPY . .` - the code. `.dockerignore` (below) strips `.git`,
+    `.venv`, `.env*`, `*.db`, `evidence/`, `notes/`, ... so no host junk
+    and no secret is copied.
+  - `RUN useradd --create-home --uid 10001 appuser && mkdir -p /app/data
+    && chown -R appuser:appuser /app` then `USER appuser` - **run as a
+    non-root user**. If the containerised app is ever exploited, the
+    attacker is an unprivileged account inside the container, not root.
+    `--create-home` gives Streamlit a `~/.streamlit` to write; `/app/data`
+    (the Day 10 SQLite audit log) is made writable for that user.
+  - `EXPOSE 8501` - documentation of the port; `compose.yaml` does the
+    actual host publishing.
+  - `CMD ["streamlit", "run", "app_v4.py", "--server.address=0.0.0.0",
+    "--server.port=8501", "--server.headless=true",
+    "--browser.gatherUsageStats=false"]` - `0.0.0.0` so the host can
+    reach it (not just container-localhost); `--headless` skips the
+    first-run e-mail prompt; `--browser.gatherUsageStats=false` stops
+    Streamlit's telemetry phone-home (a security demo should make no
+    surprise network call).
+- **`.dockerignore` line by line.** Same idea as `.gitignore` but for the
+  *build context*. Excludes: `.git` / `.venv` (history + host env, huge);
+  `__pycache__` / `*.pyc` / `.pytest_cache`; **`.env` and `.env.*`**
+  (secrets - the key one for this lab); `*.db` / `*.jsonl` (local audit
+  data); `evidence/` / `notes/` / `prompts/` / `.claude/` / `.plans/`
+  (not needed to run); and the build files themselves (`Dockerfile`,
+  `.dockerignore`, `compose.yaml`). `tests/` is deliberately **kept** so
+  Lab 8 CI can `docker run ... pytest` if it wants.
+- **`compose.yaml` line by line.** One `agentguard` service; `build: .`
+  (build from the local Dockerfile); `ports: ["8501:8501"]` (host:
+  container); `environment: AGENTGUARD_MODE: mock` (deterministic, no
+  billed Claude call, no network - it is `v2_service.py`'s default, set
+  here so the container is *explicitly* the safe mode); `volumes:
+  [agentguard-data:/app/data]` - a **named volume** for the Day 10 audit
+  DB that survives `docker compose down`. **No `env_file:`** - a live
+  Claude run would be a deliberate runtime `-e ANTHROPIC_API_KEY=...`,
+  never baked into this committed file.
+- **How a secret is kept out - four layers.**
+  1. `.dockerignore` excludes `.env` / `.env.*`, so no env file is
+     copied into the image.
+  2. the Dockerfile has **no `ENV`/`ARG` credential** and **no `COPY
+     .env`** - nothing writes a secret into a layer.
+  3. `compose.yaml` has **no `env_file:`** and only `AGENTGUARD_MODE:
+     mock`.
+  4. `scripts/check_no_secrets.py` (the release-gate step) was
+     **extended** this lab to scan `Dockerfile` and `.dockerignore` by
+     exact name (it already covered `compose.yaml` via the `.yaml`
+     suffix), so a token baked into image config now fails the gate.
+     `tests/test_check_no_secrets.py` gained tests for that
+     (`Dockerfile` + `.dockerignore` are flagged; a random extensionless
+     file like `LICENSE` is not).
+- **Deviation from the starter (compared, not copied).** Starter:
+  `FROM python:3.12-slim`, root user, `CMD` with only
+  `--server.address=0.0.0.0`, a narrower `.dockerignore`. Ours:
+  `python:3.14-slim` (match the venv - the point of "reproducible");
+  non-root `appuser`; `CMD` also `--headless` + no-telemetry + explicit
+  port; broader `.dockerignore`; the secret-scan extension.
+- **New terms:**
+  - **Image** - a read-only, layered template. **Container** - a running
+    instance of one. **Layer** - the filesystem diff one `Dockerfile`
+    instruction produces, cached and reused.
+  - **Build context** - the directory sent to the Docker daemon for
+    `COPY`; `.dockerignore` trims it.
+  - **`-slim` base image** - a stripped base (no toolchain, no docs) -
+    smaller download, smaller attack surface.
+  - **`EXPOSE` vs published `ports`** - `EXPOSE` documents the port;
+    `compose.yaml`'s `ports: "8501:8501"` actually forwards it from the
+    host.
+  - **Named volume vs bind mount** - a named volume (`agentguard-data`)
+    is Docker-managed storage that outlives the container; a bind mount
+    maps a host path in. This lab uses a named volume.
+  - **Non-root / least privilege** - the container process runs as an
+    unprivileged user so a compromise is contained.
+  - **`AGENTGUARD_MODE`** - `mock` (default, deterministic, no network)
+    vs `live` (billed Claude calls); read by `v2_service.py`.
+- **Input / processing / output / security boundary.** Input: the
+  existing repo (Python 3.14 venv, `requirements.txt`, `app_v4.py`).
+  Processing (this lab): author three text files + one scan-scope line;
+  nothing is built or run. Output: `Dockerfile`, `.dockerignore`,
+  `compose.yaml`, an extended `check_no_secrets.py` + tests, this entry.
+  Security boundary: no `docker build` / `up` / `pull` / `push`; no
+  network; no image; no secret in any of the three files, and the
+  secret scanner now covers all three. `scanner.py` and every product
+  module untouched (only the `check_no_secrets.py` scan-scope line
+  changed) - still the sole risk authority. No `sudo`, no `.env` read,
+  no git commit.
+- **Verification.** `git status --short` (the lab's command) shows new
+  `Dockerfile` / `.dockerignore` / `compose.yaml` and modified
+  `scripts/check_no_secrets.py` / `tests/test_check_no_secrets.py` /
+  `notes/learning_log.md`. `python scripts/check_no_secrets.py` ->
+  `SECRET CHECK PASS` (now scanning the two Docker files too, still
+  clean). `python -m pytest -q tests/test_check_no_secrets.py` ->
+  `9 passed` (+3). Full suite -> `852 passed` (up from `849`, no
+  regression). `python scripts/run_release_gate.py` still ends `RELEASE
+  GATE PASS for AgentGuard v4`; `python -m compileall -q .` is clean.
+  Static validation (no build, no run): `docker build --check .` ->
+  "Check complete, no warnings found" (Dockerfile is valid,
+  `python:3.14-slim` resolves, `.dockerignore` loads); `docker compose
+  config` -> the compose file parses to one `agentguard` service, port
+  8501, `AGENTGUARD_MODE: mock`, the `agentguard-data` volume. `git
+  branch` -> only `main` + `v4-development`.
+- **Why this lab exists.** A security control is only trustworthy if it
+  behaves identically wherever it runs - a verifier or allowlist that
+  passes locally but drifts in production because of a Python or library
+  version difference is a latent incident. Pinning the interpreter and
+  every dependency in an image makes the guarantees the tests prove
+  locally the *same* guarantees that run in CI and on a host. Doing it
+  with a non-root user, a secret-free build context, and a scanner that
+  now covers the image config is the "without including secrets" half of
+  the goal.
+- **What this lab did not do.** No `docker build` / `docker compose up` /
+  `docker pull` / `docker push` - the image is authored, not built or
+  run (Day 9 Lab 7). No `.github/workflows/tests.yml` change (Day 9
+  Lab 8). No image pushed to a registry. No `app_v4.py` change. No
+  `.env` created or read. No git commit, tag, push, PR, or live action.
+
+## Day 9, Lab 7 — Build and run the container in mock / dry-run mode
+
+- **The idea.** Lab 6 wrote the recipe; this lab runs it. `docker compose
+  build` turns the `Dockerfile` into a local **image**; `docker compose
+  up -d` starts a **container** from it, serving the same AgentGuard v4
+  app at `http://localhost:8501` - but now inside its version-pinned box.
+  "Test the packaged product at localhost" = confirm the container serves
+  and the v4 workflow runs the same way there as in the venv, in
+  `AGENTGUARD_MODE=mock` with the GitHub layer dry-run only, then tear it
+  down.
+- **What the build did.** `docker compose build` pulled `python:3.14-slim`
+  from Docker Hub, ran `pip install -r requirements.txt` (all **binary
+  wheels** - `rpds_py-…cp314…whl`, `pyarrow-25.0.1`, `numpy-2.5.2`,
+  `pandas-3.0.5`, `streamlit-1.62.0`, `pytest-9.1.1`, ... in ~15 s, no
+  compilation), copied the code, created the non-root `appuser`, and
+  tagged `agentguard-v4-agentguard:latest` (~894 MB). **The Python-3.14
+  contingency did not fire** - the base image matches the venv (container
+  reports `Python 3.14.7`; venv is `3.14.6`).
+- **What the run showed.**
+  - `curl http://localhost:8501` → `HTTP 200`; `curl
+    http://localhost:8501/_stcore/health` → `ok`.
+  - logs: `Uvicorn server started on 0.0.0.0:8501` / "You can now view
+    your Streamlit app" - no traceback.
+  - `docker compose exec agentguard whoami` → `appuser` (non-root
+    confirmed).
+  - `docker compose exec agentguard printenv AGENTGUARD_MODE` → `mock`;
+    `${ANTHROPIC_API_KEY:-NOT SET}` → `NOT SET` (no credential in the
+    image or its environment).
+  - in-container app smoke: `app_v4.approve_and_verify(...)` →
+    `final_state: VERIFIED`, `verification passed: True`;
+    `app_v4.github_dry_run_plan(...)` → five `DRY_RUN` rows;
+    `len(JOURNEY_STAGES)` → `6`. The whole v4 chain works inside the
+    container.
+  - `docker compose down` removed the container + network; the named
+    `agentguard-data` volume was kept (no `-v`).
+- **Correction to the Lab 6 `.dockerignore`.** Lab 6's entry said
+  `tests/` was "deliberately kept … so Lab 8 CI can `docker run … pytest`".
+  Building the image proved that wrong: `docker compose exec agentguard
+  python -m pytest -q` failed at collection because
+  `tests/test_docs_consistency.py` reads `evidence/README.md` +
+  `docs/v3_*.md` - files a *runtime* image correctly does **not**
+  include. A runtime image ships the app, not the dev/CI test suite. So
+  `.dockerignore` now also excludes `tests/` and `evals/`; the full
+  suite runs on the host and in CI (Lab 8) against the checked-out
+  source, not inside the image. This is the only file changed this lab.
+- **Mock / dry-run proof.** Three independent signals: (1)
+  `AGENTGUARD_MODE=mock` is set and `ANTHROPIC_API_KEY` is unset in the
+  container, so `v2_service`'s live path can't run; (2) the in-container
+  `github_dry_run_plan` returns only `DRY_RUN` rows -
+  `execute_plan(live=True)` is never reached; (3) the container makes no
+  outbound network call after the one-time base-image pull. The app is
+  the same deterministic, non-scoring, dry-run demo it is on the host.
+- **Parity.** The image's `COPY . .` brings in the identical `.py`
+  modules the host suite tests (the `.dockerignore` excludes no product
+  code). Host `pytest -q` → `852 passed`; the container serves and runs
+  the v4 workflow with the same result. Same code, same behaviour, one
+  pinned Python.
+- **New terms:**
+  - **`docker compose build`** - run the `Dockerfile` → a local image.
+  - **`docker compose up -d`** - start a container in the background
+    (**detached**); you keep your shell.
+  - **`docker compose exec <service> <cmd>`** - run a command inside the
+    running container.
+  - **`docker compose logs`** - the container's stdout/stderr.
+  - **`docker compose down`** vs **`down -v`** - remove the container +
+    network; `-v` would also delete the named volume (we did not).
+  - **Port publishing** - `compose.yaml`'s `ports: "8501:8501"` forwards
+    host 8501 → container 8501, so `localhost:8501` reaches Streamlit.
+  - **Image tag** - `agentguard-v4-agentguard:latest`, the name Docker
+    stores the built image under.
+  - **Parity** - the container and the venv produce identical behaviour;
+    running the same code (and, on the host, the same suite) in both is
+    how you prove it.
+- **Input / processing / output / security boundary.** Input: the Lab 6
+  `Dockerfile` / `.dockerignore` / `compose.yaml` and the repo code.
+  Processing: `docker` pulled the public base image once, built a local
+  image, ran a container serving Streamlit on 8501, and I probed it with
+  `curl` / `exec`. Output: a verified-working container (torn down at the
+  end), the built image left in the local store, and this entry.
+  Security boundary: the container runs as non-root `appuser`, with
+  `AGENTGUARD_MODE=mock` and **no `ANTHROPIC_API_KEY`**; `execute_plan`
+  is never `live=True`; no live Claude / `git` / `gh` call; no outbound
+  network except the one-time Docker Hub base-image pull; no image
+  pushed anywhere; the named volume was not wiped. `scanner.py` and every
+  product module untouched - still the sole risk authority. No `.env`,
+  no git commit.
+- **Verification.** `docker compose build` → `Image
+  agentguard-v4-agentguard Built`. `docker compose up -d` → `Container …
+  Started`. `curl -s -o /dev/null -w "%{http_code}" http://localhost:8501`
+  → `200`; `/_stcore/health` → `ok`. In-container: `whoami` → `appuser`,
+  `printenv AGENTGUARD_MODE` → `mock`, the `approve_and_verify` +
+  `github_dry_run_plan` smoke → `VERIFIED` / five `DRY_RUN`. `docker
+  compose down` → `Removed`. Host, unchanged: `python -m pytest -q` →
+  `852 passed`; `python scripts/run_release_gate.py` → `RELEASE GATE PASS
+  for AgentGuard v4`. `git status --short` → only `.dockerignore` (the
+  `tests/` + `evals/` exclusion) and `notes/learning_log.md` changed;
+  `git branch` → only `main` + `v4-development` (no `agentguard/*` - the
+  container ran nothing against git).
+- **Why this lab exists.** A deterministic security control has to
+  behave the same wherever it runs. Building the image and then
+  exercising the packaged app at `localhost` - serving, running the full
+  approve → verify → dry-run-plan chain, checking it is non-root and in
+  mock mode - is how you confirm the guarantees the host tests prove are
+  the guarantees the *shipped* artifact carries. It also surfaced a real
+  packaging mistake (a runtime image carrying its own test suite), which
+  is exactly the kind of thing "run it and look" catches that a static
+  check does not.
+- **What this lab did not do.** No product-code change. No
+  `.github/workflows/tests.yml` change (Day 9 Lab 8). No `docker push` /
+  registry. No live Claude / `git` / `gh` call. No `docker compose down
+  -v` (the volume survives). The built image is left in the local store
+  for Lab 8; it is not committed (images are not files in the repo). No
+  git commit, tag, push, PR, or live action.
+
+## Day 9, Lab 8 — Update CI and final security review
+
+- **The idea.** Two things close out Day 9. (1) **CI**: `.github/
+  workflows/tests.yml` is the script GitHub runs on every push / PR - it
+  checks out the code, installs the pinned deps, and runs the gates.
+  Until now it ran `pytest -q` + the v2 and v3 evals on Python 3.12. Now
+  it also runs the **v4 failure-injection eval** (which injects a
+  boundary violation and passes only if v4 refuses it) and the **secret
+  scan**, on Python **3.14** (matching the venv and the container). (2) A
+  **final security review** of the v4 action boundary, below.
+- **The CI change, line by line.**
+  - `python-version: "3.12"` -> `"3.14"` - CI, the local venv
+    (`3.14.6`), and the `python:3.14-slim` container image now all agree.
+    Closes the last parity gap Day 9 opened; `docker compose exec ...
+    python --version` in the container is `3.14.7`.
+  - `- name: Run v4 failure-injection evaluation ...` / `run: python
+    evals/run_v4_evals.py` - added after the v3 eval. On every push, the
+    10 injections (state-skip, merged-PR rollback, unapproved repo,
+    risk-raising remediation, drifted approval, broken `gh`, dry-run
+    default, terminal-state recording, forbidden token, plus one
+    positive control) must all still be refused. A regression that lets
+    one through turns the PR red **before merge**.
+  - `- name: Check no secret-shaped strings are committed` / `run: python
+    scripts/check_no_secrets.py` - the release-gate secret scan now also
+    runs in CI. Since Day 9 Lab 6 it covers `Dockerfile` and
+    `.dockerignore` by name too.
+  - `actionlint` (run once via its Docker image) confirmed the YAML is a
+    valid GitHub Actions workflow - exit 0, no findings.
+  - `tests/test_ci_workflow.py` (raw-text assertions, no pyyaml) gained
+    tests that CI names the v4 eval, the secret scan, and Python 3.14,
+    and that `run_v4_evals.py` exists.
+- **Final security review - the v4 action boundary.** Scope: every
+  action-layer module built Days 3-9, as the pending diff on
+  `v4-development`. Each row is a *challenge* to the invariant and where
+  it is *enforced*.
+
+  | Challenge | Enforced by | Finding |
+  |---|---|---|
+  | Can the AI layer approve / apply / verify / score? | No v4 module imports `claude_analyst` / `anthropic` / `v2_service` / `mock_analyst` (grepped: none). The whole action path - `remediation_templates`, `approval`, `verifier`, `workflow`, `audit_db`, `github_plan`, `rollback`, `app_v4` - is deterministic Python. | **HOLDS** - there is no AI in the action path to constrain. |
+  | Can a proposal *set* a risk score? | `RemediationProposal` has 5 fields (`template_id`, `agent_name`, `field_changes`, `rationale`, `source_sha256`) - no score. `verifier.verify()` calls v1 `scan_environment` and only *compares* HIGH counts. | **HOLDS** - `scanner.py` is the sole score authority; a proposal predicts, never sets. |
+  | Can the MCP discovery server grow a write tool? | `mcp_server.py` / `mcp_client.py` untouched by all of v4 (git). `scripts/validate_starter_kit.py` (release-gate step 1) fails if the server is not exactly the 5 named read-only tools or any name reads as a write verb. | **HOLDS** - 5 read-only tools; remediation is a separate governed workflow. |
+  | Can `execute_plan` run a live `git` / `gh` command without an explicit opt-in? | `live` is keyword-only with default `False`; `app_v4.py` never passes `live=True` (test asserts the substring is absent); no UI button runs a command. `test_github_plan.py` proves no plan contains `merge` / `--force` / a `main` push and every PR is `--draft`. | **HOLDS** - review surface, not trigger. |
+  | Can a rollback rewrite merged history? | `rollback.rollback_plan(..., merged=True)` raises `ValueError` "Automatic rollback is refused after merge." `merged` is required + type-checked. | **HOLDS**. |
+  | Can a stale approval or a failed verification proceed? | `approval.validate_approval` raises on decision != APPROVE or a drifted hash; `verifier.require_verified` raises on any failed check. Both are exercised by `run_v4_evals.py`. | **HOLDS** - fail closed to `FAILED`. |
+  | Can the workflow skip a gate (e.g. `PROPOSED` -> `VERIFIED`)? | `workflow.transition()` is an allowlist; only mapped arrows are accepted, all ~70 illegal pairs raise (tested). | **HOLDS**. |
+  | Can a secret enter the image or the repo? | `.dockerignore` excludes `.env*`, `*.db`, `*.jsonl`; the `Dockerfile` has no `ENV` credential / `COPY .env`; `compose.yaml` has no `env_file:`; `check_no_secrets.py` (release gate **and** now CI) scans `.py` / `.md` / `.yml` / `.yaml` / `Dockerfile` / `.dockerignore`. | **HOLDS** - `SECRET CHECK PASS`. |
+  | Does the container run privileged? | `Dockerfile` creates `appuser` (uid 10001) and `USER appuser`; `docker compose exec ... whoami` -> `appuser`; no `ANTHROPIC_API_KEY` in the image or its environment; `AGENTGUARD_MODE=mock`. | **HOLDS**. |
+
+  **Conclusion: the v4 action boundary holds.** Deterministic rules
+  decide *what*; software verifies *correctness*; a human approves
+  *intent*; nothing in the action path is an AI. The 855-test suite and
+  the 4 eval suites (now all in CI) are the proof, re-run on every push.
+
+- **What CI now guarantees.** "All versions remain tested" - `pytest -q`
+  is every v1 + v2 + v3 + v4 unit test (855); the v2, v3, and v4 eval
+  suites each run. "The action boundary is challenged" - `run_v4_evals.py`
+  actively injects each violation and the build fails if any is not
+  refused. No `ANTHROPIC_API_KEY` is needed for any of it.
+- **Residual / deferred (tracked, not vulnerabilities).**
+  - `v4_service.py` (the orchestrator that would chain transition ->
+    record_event -> propose -> hash -> decide -> validate -> verify ->
+    require_verified -> create_plan) is not built - the app composes the
+    pieces directly for now (Day 10).
+  - `run_v4_evals.py` is in CI but not yet in `scripts/run_release_gate.py`
+    (Day 10 Lab 1).
+  - `docs/v4_architecture.md` still sketches `APPROVED -> REJECTED` and
+    `DRAFT_PR_CREATED -> FAILED` arrows the implemented map does not have
+    (Day 10 Lab 5 reconciliation).
+  - `.agentguard/pr_body.md` is referenced by the plan's `gh pr create`
+    but nothing writes it - a real live run (Day 10 Lab 3) needs it
+    first.
+  - `docs/v4_threat_model.md` is a Day 10 deliverable.
+- **New terms:**
+  - **CI / GitHub Actions workflow** - a YAML file under
+    `.github/workflows/` describing jobs GitHub runs automatically.
+  - **Job / step / runner** - a job runs on a fresh VM (the runner);
+    each step is one command, run in order; the job fails at the first
+    non-zero exit.
+  - **`on: [push, pull_request]`** - the events that trigger the
+    workflow.
+  - **Regression gate** - a check that turns red if previously-passing
+    behaviour breaks.
+  - **Failure-injection eval as a CI gate** - `run_v4_evals.py` in CI
+    means a change that re-opens a closed door fails the PR.
+  - **Security review / boundary challenge** - deliberately asking "can
+    X bypass the control?" for each control and recording where it is
+    enforced.
+  - **`/security-review`** - Claude Code's built-in command that reviews
+    the pending diff for vulnerabilities (spends API budget; the user
+    may run it as an independent second pass).
+- **Input / processing / output / security boundary.** Input: the
+  current `tests.yml`, the v4 modules (read-only, for the review).
+  Processing: add two CI steps + bump the Python line; add matching CI
+  tests; write the review. Output: an updated workflow (takes effect on
+  the next push - **not this lab**), an updated CI test, this entry.
+  Security boundary: no product-code change; `scanner.py` and every
+  module untouched - still the sole risk authority. The new CI steps are
+  deterministic and need no credential. No commit / push, so CI does not
+  actually execute here. `/security-review` was **not** run by me (it
+  would spend the user's API budget) - the deterministic review above is
+  the deliverable; the user may run the slash command themselves.
+- **Verification.** `git status --short` shows modified
+  `.github/workflows/tests.yml`, `tests/test_ci_workflow.py`,
+  `notes/learning_log.md`. `actionlint` (Docker) -> exit 0, no findings
+  (valid workflow). `python -m pytest -q tests/test_ci_workflow.py` ->
+  `9 passed` (+3). `python evals/run_v4_evals.py` -> `V4
+  FAILURE-INJECTION EVAL PASS: 10 of 10 checks held`. `python
+  scripts/check_no_secrets.py` -> `SECRET CHECK PASS`. Full suite ->
+  `855 passed` (up from `852`, no regression). `python
+  scripts/run_release_gate.py` still ends `RELEASE GATE PASS for
+  AgentGuard v4` (unchanged - the gate wires in the v4 eval on Day 10).
+  `python -m compileall -q .` is clean. `git branch` -> only `main` +
+  `v4-development`.
+- **Why this lab exists.** A control that is only checked when someone
+  remembers to check it is not a control. Putting the failure-injection
+  eval and the secret scan in CI makes every proposed change re-prove,
+  automatically, that the action boundary still refuses what it must
+  refuse - a reviewer sees a red check before they can merge a
+  regression. The written review is the human counterpart: walk each
+  invariant, name where it is enforced, confirm it holds. Together they
+  are how "the AI can only explain and propose" stays true as the code
+  keeps changing.
+- **What this lab did not do.** No product-code change. No
+  `scripts/run_release_gate.py` change (Day 10 Lab 1). No commit / push
+  - CI does not run for this lab; the workflow change is live on the
+    next push. No `/security-review` API spend by me. No
+    `docs/v4_threat_model.md` (Day 10). No `Dockerfile` / `.dockerignore`
+    / `compose.yaml` / `app_v4.py` change. No git tag, PR, or live
+    action.
+
+## Day 9 Summary — Labs 1 through 8
+
+1. **Map the v4 Streamlit user journey** - `JOURNEY_STAGES`, a read-only
+   six-stage map (Discovery -> Proposal -> Approval -> Verification ->
+   Plan -> Audit) on the page, each stage tied to a real
+   `workflow.STATES` token so the map cannot drift from the machine.
+2. **App v4 input and proposal controls** - agent selectbox + allowlisted
+   template selectbox (+ validated owner field for `ASSIGN_OWNER`) ->
+   `build_ui_proposal()` -> the `RemediationProposal` + its two hashes,
+   nothing applied.
+3. **Display hashes, approval, verification, events** -
+   `approve_and_verify()`: reviewer + reason + APPROVE/REJECT -> the
+   content hashes the approval is bound to, the `ApprovalRecord`, the
+   `VerificationResult` checklist, an in-memory event timeline. A bad
+   input raises; a REJECT or a failed verification is *shown*, not
+   raised.
+4. **Display the GitHub dry-run plan and safety warnings** - for a
+   `VERIFIED` run only, `github_dry_run_plan()` shows the exact five
+   `git`/`gh` commands, their `DRY_RUN` status, and
+   `GITHUB_SAFETY_WARNINGS`. No live-execution control anywhere.
+5. **Install Docker Desktop and verify docker commands** - `docker`
+   29.7.2, `compose` v5.4.0, healthy daemon. Machine-wide install run by
+   the user; log-only.
+6. **Create Dockerfile, .dockerignore, compose.yaml** - a reproducible
+   local service: `python:3.14-slim` (matches the venv), layer-cached
+   deps, **non-root `appuser`**, headless/no-telemetry `CMD`;
+   `.dockerignore` excludes `.env*` / `.git` / `.venv` / data; `compose.yaml`
+   one service, `AGENTGUARD_MODE: mock`, no `env_file:`;
+   `check_no_secrets.py` extended to scan the Docker files.
+7. **Build and run the container in mock / dry-run mode** - `docker
+   compose up` -> the app at `localhost:8501`, HTTP 200, non-root, mock,
+   no API key, the full v4 workflow runs in-container. Building revealed
+   the image was shipping `tests/` -> `.dockerignore` now excludes
+   `tests/` + `evals/` (a runtime image ships the app, not the suite).
+8. **Update CI and final security review** - CI now also runs
+   `run_v4_evals.py` + `check_no_secrets.py` on Python 3.14; a written
+   review confirms the v4 action boundary holds (no AI in the action
+   path, `scanner.py` sole score authority, 5 read-only MCP tools,
+   dry-run/draft-only, non-root, secret-free).
+
+**Where Day 9 leaves off:** the v4 Streamlit app is complete and runs
+both from the venv (`streamlit run app_v4.py`) and as a container
+(`docker compose up`) - proposal -> approve+verify -> dry-run plan, all
+deterministic, mock/dry-run, with the control evidence visible on the
+page. `Dockerfile` / `.dockerignore` / `compose.yaml` package it
+reproducibly with no secret; CI runs `pytest -q` + the v2/v3/v4 eval
+suites + the secret scan on every push. The suite is at **855 passed**
+(800 at the end of Day 8 -> +55 across Day 9; 684 at the end of Day 7 ->
++171 across Days 8-9); `python scripts/run_release_gate.py` still ends
+`RELEASE GATE PASS for AgentGuard v4`; `git branch` is still only `main`
++ `v4-development`; everything since the Day 1 baseline commit `517db77`
+is uncommitted on `v4-development`. Day 10 is the release: run the
+complete gate (and wire the v4 eval into it), the full local browser
+scenario, optionally one real draft PR + its rollback, then finalise
+README / architecture / threat model / interview brief / backlog and
+reconcile `docs/v4_architecture.md` with `workflow.py`.
+
+## Day 10, Lab 1 — Run the complete v4 release gate
+
+- **The idea.** AgentGuard has a **release gate**: one script,
+  `scripts/run_release_gate.py`, that runs *every* must-pass automated
+  check and prints a single line at the end. Through Day 9 that gate ran
+  the v1/v2/v3 proof - scaffolding check, full unit suite, v2 eval
+  matrix, v3 security suite, secret scan - but it never ran
+  `evals/run_v4_evals.py`, the Day 8 failure-injection eval. CI already
+  ran the v4 eval on every push; the local one-command gate did not. This
+  lab wires the v4 eval into the gate (after `pytest -q`, before the
+  secret scan) and updates the gate's own test so a future edit can't
+  quietly drop it again. Net change: three lines of code plus one test.
+- **New terms:**
+  - **Release gate** - a single script that runs all the release
+    checks in order and fails closed: it stops at the first check that
+    exits non-zero, and the final `RELEASE GATE PASS for AgentGuard v4`
+    line prints only if every check passed. There is no partial pass.
+  - **Failure-injection eval** (`evals/run_v4_evals.py`) - the inverse of
+    a normal test suite. Each of the ten checks feeds v4 a deliberately
+    bad input (a skipped workflow state, a rollback of an already-merged
+    PR, a risk-raising remediation, a drifted approval, a broken `gh`
+    call, an unapproved repo) and passes only if v4 **refuses** it. Two
+    are positive controls (a valid remediation still verifies and still
+    reaches a five-command plan) so "fails closed" is not just "broken
+    closed". It patches every `subprocess` call, uses a throwaway temp
+    SQLite file, and touches no network - offline and free.
+  - **`COMMANDS` list** - the ordered list of shell strings the gate
+    runs. Order is load-bearing: the v4 eval sits after `python -m pytest
+    -q` so v4 threats are only graded once the unit baseline is green.
+  - **Regression** - a previously-passing check that a change breaks. The
+    gate is exactly the guard against one: `pytest -q` must stay green
+    (855 -> 856 here, +1 for the new ordering test), and every inherited
+    v1/v2/v3 check still runs unchanged.
+- **What changed.**
+  - `scripts/run_release_gate.py` - added
+    `"python evals/run_v4_evals.py"` to `COMMANDS` between the v3 eval and
+    `check_no_secrets.py`; updated the module docstring's numbered list
+    (v4 eval is now step 5, secret scan step 6).
+  - `tests/test_run_release_gate.py` - added
+    `assert "evals/run_v4_evals.py" in joined` to
+    `test_gate_runs_every_required_check`; added
+    `test_v4_eval_runs_after_the_full_test_suite` (mirrors the existing v3
+    ordering test); docstring now says the tests pin the v3 **and v4**
+    suites. `test_every_script_the_gate_calls_exists` already proved the
+    v4 eval file is real - no change needed there.
+- **Compared with the starter kit.** The starter
+  `scripts/run_release_gate.py` already lists `python evals/run_v4_evals.py`
+  in its `COMMANDS`, in exactly this position - this lab brings the repo's
+  gate up to that. The starter has no `tests/test_run_release_gate.py`;
+  this repo's version is a local addition and stays, now extended to cover
+  the v4 command.
+- **Not required, not done.** `scripts/validate_starter_kit.py` (which
+  the gate runs first) checks the 80 lab headings, the prompt files,
+  Python syntax, the no-author-machine-paths rule, and the 5 read-only
+  MCP tools - it does **not** look for `docs/v4_threat_model.md`,
+  `docs/final_mvp_interview_brief.md`, or `docs/post_mvp_backlog.md`, so
+  the gate passes without them. Those three docs are created in Day 10
+  Labs 5 / 7 / 8, not here.
+- **Input / processing / output / security boundary.** Input: the current
+  repo (Days 1-9, uncommitted on `v4-development`) and the command
+  `python scripts/run_release_gate.py`. Processing: one added line runs
+  `evals/run_v4_evals.py` as a subprocess with a hard-coded command
+  string - no user input, no arguments, no shell interpolation of
+  anything dynamic. Output: a gate run with six `>>>` blocks (was five)
+  ending `RELEASE GATE PASS for AgentGuard v4`; an updated test; this
+  entry. Security boundary: deterministic checks only. Nothing in the
+  gate touches the network, `gh`/`git` live, API keys, or money; the v4
+  eval it now calls patches every `subprocess` path and uses synthetic
+  data plus a temp DB. `scanner.py` stays the sole risk-score authority;
+  no AI runs anywhere in the gate. No commit, push, PR, tag, or live
+  action.
+- **Verification.**
+  - `python -m pytest -q tests/test_run_release_gate.py` -> `5 passed`
+    (was 4).
+  - `python evals/run_v4_evals.py` ->
+    `V4 FAILURE-INJECTION EVAL PASS: 10 of 10 checks held (fails closed)`.
+  - `python -m pytest -q` -> `856 passed` (855 + the new ordering test),
+    no regression.
+  - `python scripts/run_release_gate.py` -> the run now includes a
+    `>>> python evals/run_v4_evals.py` block and still ends
+    `RELEASE GATE PASS for AgentGuard v4`.
+  - `python -m compileall -q .` -> clean (exit 0).
+  - `git status --short` -> only `scripts/run_release_gate.py`,
+    `tests/test_run_release_gate.py`, `notes/learning_log.md` newly
+    changed. `git branch` -> still only `main` + `v4-development`.
+- **Why this lab exists.** "Is this release safe to ship?" should be
+  answerable by running one command, not by a person remembering to run
+  six things in the right order. Day 10 is the v4 release, and its
+  learning goal is "one command proves all inherited **and** v4
+  controls" - which is only true once the v4 failure-injection eval is
+  part of the gate. Wiring it in, and pinning it with a test, makes the
+  gate the single source of "all controls held".
+- **What this lab did not do.** No new `docs/` files (Labs 5 / 7 / 8). No
+  change to `README.md` / `START_HERE.md` / `evidence/README.md` /
+  `docs/v3_*.md` / `tests/test_docs_consistency.py` (Lab 5). No change to
+  `docs/v4_architecture.md` (its two-arrow drift is reconciled in Lab 5).
+  No `.github/workflows/tests.yml` change (it has run the v4 eval since
+  Day 9 Lab 8). No commit, push, PR, tag, API spend, or live external
+  action.
+
+## Day 10, Lab 2 — Run the full local browser scenario
+
+- **The idea.** No new feature. `app_v4.py` has been complete since Day
+  9; this lab *runs* it end to end and watches one real security finding
+  travel the whole way - from "the scanner flagged this agent" to "here
+  are the five commands that would open a draft pull request to fix it" -
+  with nothing real touched. The concrete story is the learning goal
+  itself: **a finding -> a verified proposal -> a dry-run plan.** The
+  code deliverable is one automated scenario test that walks the *real*
+  connected inventory through that chain (every prior end-to-end test in
+  `tests/test_app_v4.py` used a tiny hand-written `_env()` fixture), plus
+  a headless boot of the page to confirm it serves with no exception.
+- **The scenario, stage by stage** (agent inventory =
+  `connected_environment/agents.json`, synthetic, read-only):
+  1. **Discovery.** `scanner.py` scans the three demo agents.
+     *Customer Support Agent* is HIGH: `delete_customer_record` with no
+     human gate (AG-002), sensitive-data access with no human gate
+     (AG-003), `send_email` with no gate (AG-004), empty owner (AG-005).
+     *Deployment Agent* is also HIGH; *Research Agent* is clean. -> **2
+     HIGH-risk agents.**
+  2. **Proposal.** Pick that agent + the `REQUIRE_HUMAN_APPROVAL`
+     template -> the one bounded field change
+     `{"human_approval_required": true}`. A `RemediationProposal` plus
+     its SHA-256 and the source SHA-256.
+  3. **Approval.** Reviewer "Priya Nair" + a reason + APPROVE ->
+     an `ApprovalRecord` bound to *both* the proposal hash and the
+     source hash. (A REJECT would end the workflow here, recorded.)
+  4. **Verification.** `verify()` copies the inventory to a throwaway
+     file, applies the change to the copy, re-scans: AG-002/003/004 all
+     clear (each needs "no approval"), so HIGH count drops **2 -> 1**
+     (Deployment Agent untouched). All **10 / 10** check rows pass ->
+     `final_state = "VERIFIED"`. `require_verified()` would have blocked a
+     failed result before any GitHub step.
+  5. **Plan.** `github_dry_run_plan(workflow_id)` -> the five commands,
+     every one `DRY_RUN`: `git checkout -b agentguard/<id>` ->
+     `git add connected_environment/agents.json` -> `git commit -m ...`
+     -> `git push -u origin agentguard/<id>` ->
+     `gh pr create --draft --repo justintinlei/agentguard-remediation-demo
+     --title ... --body-file .agentguard/pr_body.md`. Shown, not run.
+- **New terms:**
+  - **End-to-end / integration scenario test** - one test that exercises
+    many components wired together as a flow (load -> propose -> approve
+    -> verify -> plan), rather than each function alone. It complements,
+    not replaces, the unit tests.
+  - **Connected-demo inventory** - `connected_environment/agents.json`,
+    the synthetic three-agent registry `app_v4.load_environment()`
+    actually reads. Distinct from the `_env()` mini-fixture the older
+    tests use.
+  - **Throwaway / isolated candidate** - the temp copy `verifier.py`
+    applies the proposal to and scans; the real inventory is never
+    written.
+  - **Before / after HIGH count** - the verifier's core rule: re-scan
+    before and after, and require the HIGH-risk agent count does **not
+    increase**. Here it strictly drops (2 -> 1).
+  - **Headless boot** - `streamlit run ... --server.headless true`: the
+    server runs without opening a browser, so it can be probed with
+    `curl` (HTTP 200, `/_stcore/health` -> `ok`) to prove the module
+    loads and `render()` draws with no exception.
+- **What was inspected but not changed.**
+  - `app_v4.py` - complete since Day 9 (safety boundary, journey map,
+    `build_ui_proposal` / `approve_and_verify` / `github_dry_run_plan`,
+    `gh auth` panel, `__main__`-guarded `render()`). Nothing to add.
+  - `scripts/run_release_gate.py` / `scripts/validate_starter_kit.py` -
+    unchanged; Day 10 Lab 1 already wired the v4 eval into the gate.
+  - **`v4_service.py` / `audit_db` are deliberately not wired into the
+    app.** The starter's `app_v4.py` calls `v4_service.create_and_verify`
+    and `audit_db.list_events(DB_PATH, ...)`; this repo replaced that with
+    the granular helpers, and a test
+    (`test_app_v4_imports_only_the_expected_engine_modules_so_far`)
+    *forbids* `import v4_service` / `import audit_db` in `app_v4.py`. So
+    the page's event timeline is **in-memory** (an ordered list in the
+    `approve_and_verify` return), not the durable SQLite
+    `workflow_events` table journey-stage 6 describes. Closing that gap
+    (a real `v4_service` + on-disk audit) is a Day 10 Lab 5 /
+    post-MVP-backlog item, not this lab's.
+- **Deviation from the starter (compared, not copied).** The starter has
+  no `tests/test_app_v4.py` at all - the whole file is a local addition.
+  The starter's app also targets the placeholder repo
+  `YOUR_GITHUB_USERNAME/agentguard-remediation-demo` (which this repo's
+  allowlist-enforcing `create_plan` rejects); the scenario test uses the
+  real allowlisted `app_v4.DEMO_REPO`.
+- **Input / processing / output / security boundary.** Input: the real
+  `connected_environment/agents.json` (synthetic, read-only) + a chosen
+  agent / template / reviewer / reason / APPROVE. Processing:
+  `load_environment()` -> `approve_and_verify()` (template-bounded
+  proposal -> `decide()` -> `verify()` on an isolated copy) ->
+  `github_dry_run_plan()` (`create_plan` + `execute_plan(live=False)`).
+  Output: the page sections all populated (proposal + two hashes,
+  `ApprovalRecord`, 10/10 verification checklist, `PROPOSED -> APPROVED
+  -> VERIFIED` timeline, five `DRY_RUN` commands), one new passing
+  scenario test, this entry. Security boundary: deterministic end to end
+  - `scanner.py` is the sole score authority (the proposal predicts, it
+  never sets); verification writes only a throwaway copy; **no `git` /
+  `gh` command runs** (the plan is a review surface); no token is read or
+  stored (`gh` keeps it in `~/.config/gh/`); no AI in the path; no
+  network; no cost; no commit.
+- **Verification.**
+  - `python -m pytest -q tests/test_app_v4.py` -> `55 passed` (54 + the
+    new scenario test).
+  - `python -m pytest -q` -> `857 passed` (856 + 1), no regression.
+  - `streamlit run app_v4.py --server.headless true --server.port 8599`
+    (~6 s) -> `curl http://localhost:8599` = `200`;
+    `curl .../_stcore/health` = `ok`; server log shows
+    `Uvicorn server started` and no traceback. Then stopped.
+  - `python scripts/run_release_gate.py` -> ends
+    `RELEASE GATE PASS for AgentGuard v4`.
+  - `python -m compileall -q .` -> clean (exit 0).
+  - `git status --short` -> only `tests/test_app_v4.py` and
+    `notes/learning_log.md` newly changed. `git branch` -> still only
+    `main` + `v4-development`.
+- **Why this lab exists.** Unit tests prove each control in isolation;
+  they do not prove the controls *compose* into the workflow a user
+  actually drives. Walking the real inventory from a scanner finding to a
+  reviewable draft-PR plan - and pinning that exact path with one
+  readable test - is what turns "we built the pieces" into "the product
+  does the job", and it is the demo an interviewer or a security
+  reviewer would ask to see first.
+- **What this lab did not do.** No change to `app_v4.py` or any engine
+  module. No `v4_service` / `audit_db` wiring (out of scope; would break
+  a test). No new `docs/` files (Labs 5 / 7 / 8). No change to
+  `README.md` / `START_HERE.md` / `evidence/README.md` /
+  `docs/v4_architecture.md` / `tests/test_docs_consistency.py` (Lab 5).
+  No real `git` / `gh` action (Lab 3). No commit, push, PR, tag, API
+  spend, or live external action.
+
+## Day 10, Lab 3 — Optionally create one draft pull request in the demo repo
+
+- **The idea.** Every GitHub step so far has been **dry-run**: the code
+  shows the exact `git` / `gh` commands and runs none of them. This lab
+  is the one deliberate exception - actually opening a pull request in
+  the synthetic demo repo - done so a human has reviewed every command
+  and every line of the PR description first, and so the PR can only ever
+  land as a **draft** (GitHub disables its merge button until a person
+  clicks "Ready for review"). One concrete gap blocked that:
+  `create_plan()`'s fifth command is `gh pr create --draft ... --body-file
+  .agentguard/pr_body.md`, but **nothing wrote that file**
+  (`docs/v4_github_demo_setup.md` said so: "nothing wires that yet").
+  This lab adds the missing helper, `write_pr_body()`, plus the runbook
+  for the optional live PR. **The live PR was not created this session**
+  (deferred, my choice); the wiring and the runbook are in place for when
+  it is.
+- **`write_pr_body(target_dir, **fields) -> Path` line by line.**
+  - `body = render_pr_body(**fields)` - the Day 2 template filler. It
+    raises `KeyError` here if any of the seven review fields is missing,
+    **before** any directory or file is created (a half-written body is
+    worse than none).
+  - `path = Path(target_dir) / PR_BODY_PATH` - `PR_BODY_PATH` is the
+    constant `".agentguard/pr_body.md"`. `target_dir` has **no default**:
+    the caller must name it, so the function can never write into the
+    AgentGuard source repo by accident. It is meant to be the checked-out
+    **demo-repo working tree** - the same cwd the live `git` / `gh`
+    commands run in, so `gh pr create --body-file .agentguard/pr_body.md`
+    (a relative path) finds the file.
+  - `path.parent.mkdir(parents=True, exist_ok=True)` - create
+    `.agentguard/` if absent; a re-run is fine.
+  - `path.write_text(body, encoding="utf-8")` - overwrite any stale body.
+  - `return path` - so the caller can print / review it.
+- **New terms:**
+  - **Live write action** - a command that changes something outside this
+    machine (a branch on GitHub, a PR). The opposite of dry-run.
+  - **`--body-file`** - a `gh` flag: read the PR description from a named
+    local file instead of from a command-line argument. Keeps a
+    multi-line structured description out of shell parsing entirely.
+  - **Draft pull request** - a PR explicitly marked not-ready; the merge
+    button is disabled until a human takes it out of draft. A
+    machine-opened PR that *starts* as a draft is a proposal, not an
+    applied change.
+  - **Working tree / cwd for the live run** - the directory the `git` /
+    `gh` commands execute in. For AgentGuard that is the **demo-repo
+    clone** (`~/Developer/AgentGuard/01-Working/agentguard-remediation-demo`),
+    never `agentguard-v4`. All live git activity happens there;
+    `agentguard-v4`'s branches are untouched.
+  - **Opt-in / explicit approval** - the live PR is off by default and
+    happens only on a separate, deliberate "yes"; the lab's automated
+    check is just `pytest`.
+- **The optional live draft PR - the runbook** (all steps run **in the
+  demo-repo clone**, never in `agentguard-v4`; nothing here was executed
+  this session):
+  1. `cd ~/Developer/AgentGuard/01-Working/agentguard-remediation-demo`
+     then `git checkout main && git pull` - clean start.
+  2. Apply the Lab 2 verified remediation to
+     `connected_environment/agents.json`: set the *Customer Support
+     Agent*'s `"human_approval_required"` to `true` (the exact candidate
+     `verifier.verify()` already approved - HIGH count 2 -> 1).
+  3. Render the PR body into this working tree:
+     `python -c "import sys; sys.path.insert(0, '<path-to>/agentguard-v4');
+     import github_plan; print(github_plan.write_pr_body('.',
+     workflow_id='wf-demo01', template_id='REQUIRE_HUMAN_APPROVAL',
+     agent_name='Customer Support Agent', finding='AG-002/AG-003 without
+     human approval', predicted_score='10', source_sha256='<hash>',
+     proposal_sha256='<hash>'))"`
+  4. **Review** `.agentguard/pr_body.md` and `git diff` - this is the
+     human checkpoint.
+  5. Run the five commands - by hand, or
+     `github_plan.execute_plan(github_plan.create_plan(
+     "justintinlei/agentguard-remediation-demo", "wf-demo01"), live=True)`
+     with cwd = this working tree. `live=True` is keyword-only, no-shell,
+     `check=True`, and stops at the first failure.
+  6. On github.com: confirm the PR **exists**, is a **draft**, is **not
+     merged**, and its branch is `agentguard/wf-demo01`. Screenshot it.
+  7. Leave it open - **Day 10 Lab 4** demonstrates the rollback (close the
+     PR, delete the branch).
+  No `merge`, `--force`, `--auto`, or `main` push at any step - the plan
+  contains none of those tokens (tested).
+- **The rendered body (preview).** `render_pr_body(...)` /
+  `write_pr_body(...)` produce:
+  `## AgentGuard remediation proposal` then labelled lines - Workflow ID,
+  Template, Target agent, Finding addressed, Predicted risk score after
+  change, Source environment SHA-256, Proposal SHA-256 - then the fixed
+  footer: "generated ... from an allowlisted remediation template. It is
+  a **draft** ... AgentGuard has no merge capability. Synthetic training
+  data only. Never merge into a production system."
+- **What was inspected but not changed.** `github_plan.create_plan` /
+  `execute_plan` / the allowlist / `GitHubPlan` - all complete since Day
+  7; `write_pr_body` is the small wrapper that finishes the wiring.
+  `scripts/run_release_gate.py` / `scripts/validate_starter_kit.py` -
+  unchanged. The demo repo - clean on `main` at `e147248` before and
+  after this lab.
+- **Files touched beyond the named test.** `.gitignore` gains
+  `.agentguard/` - the rendered body is a transient generated artifact
+  (hashes + finding text, no secret) that must never be committed to the
+  source repo. `docs/v4_github_demo_setup.md` - the two "nothing wires
+  that yet" sentences now describe `write_pr_body()`; that doc is
+  referenced by no test and is not under the Lab-5 v3-language
+  constraint.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `github_plan.py` is shorter than this repo's and *also* never writes
+  `.agentguard/pr_body.md` - there is no starter `write_pr_body` to copy.
+  This repo already had `render_pr_body`; `write_pr_body` is the obvious
+  one-write wrapper around it.
+- **Input / processing / output / security boundary.** Input: the seven
+  review fields for one verified remediation + a target directory.
+  Processing: `write_pr_body` -> `render_pr_body` (KeyError first on a
+  missing field) -> `mkdir .agentguard/` -> write the markdown -> return
+  the path. Output: `.agentguard/pr_body.md` in the named directory; six
+  new passing tests; this runbook. Optionally (not this session) one
+  draft PR. Security boundary: `write_pr_body` touches only the path it
+  is handed - no implicit default, so it cannot write into the source
+  repo; the body carries no secret; no `git` / `gh` runs inside
+  `github_plan.py` except `execute_plan(plan, live=True)` (keyword-only,
+  no-shell, `check=True`, fail-fast); the plan has no
+  merge / `--force` / `--auto` / `main`-push anywhere; all live git
+  activity would be in the sibling demo clone; `scanner.py` stays the
+  sole risk authority; no AI in the path.
+- **Verification.**
+  - `python -m pytest -q tests/test_github_plan.py` -> `168 passed`
+    (162 + the 6 new `write_pr_body` tests).
+  - `python -m pytest -q` -> `863 passed` (857 + 6), no regression.
+  - `python scripts/run_release_gate.py` -> ends
+    `RELEASE GATE PASS for AgentGuard v4`.
+  - `python -m compileall -q .` -> clean (exit 0).
+  - `git status --short` (agentguard-v4) -> only `github_plan.py`,
+    `tests/test_github_plan.py`, `.gitignore`,
+    `docs/v4_github_demo_setup.md`, `notes/learning_log.md` changed.
+    `git branch` -> still only `main` + `v4-development`.
+  - demo repo -> clean on `main`, untouched.
+- **Why this lab exists.** An enterprise remediation tool is judged on
+  its *one* dangerous capability: the moment it writes to a real system.
+  v4's answer is that the write is a single, reviewable, draft-only pull
+  request on a dedicated repo - never a merge, never `main`, never a
+  production repo - and every command and the full PR description are
+  visible to a human before anything runs. Wiring the PR-body write is
+  the last mechanical piece of that; keeping the live run an explicit
+  opt-in with its own approval is the point of the design.
+- **What this lab did not do.** Did **not** create the live draft PR
+  (deferred). No change to `create_plan` / `execute_plan` / the allowlist
+  / `GitHubPlan`. No new `docs/` files (Labs 5 / 7 / 8). No change to
+  `README.md` / `START_HERE.md` / `evidence/README.md` /
+  `docs/v4_architecture.md` / `scripts/*` / `tests/test_docs_consistency.py`
+  (Lab 5). No commit, push, tag, API spend, or live external action.
+
+## Day 10, Lab 4 — Demonstrate rollback of the unmerged draft
+
+- **The idea.** "Closing the loop" means: after AgentGuard opens a draft
+  pull request there must be a clean, safe, auditable way to **undo** it.
+  The key point is that **before a merge** the undo is genuinely safe to
+  automate because every step is reversible - closing a PR (not merging)
+  can be reopened; deleting a remote feature branch can be re-pushed from
+  a local copy; neither rewrites shared history. **After a merge** the
+  change is already in `main` and the only correct undo is a *new
+  reviewed `git revert` PR*, which AgentGuard does not automate -
+  `rollback_plan(..., merged=True)` refuses outright. All the machinery
+  for this was built on Days 7-8; this lab walks the whole path end to
+  end and pins it with three readable tests.
+- **New terms:**
+  - **Close the loop** - give the system a defined, safe way to reverse
+    an action it took, so the workflow has a clean ending in *every*
+    case (success, rejection, failure, or rollback).
+  - **Pre-merge rollback** - undoing a PR that has not been merged:
+    `gh pr close` + `git push origin --delete <branch>`. Both reversible.
+  - **`gh pr close <n>`** - closes a pull request *without* merging it
+    (distinct from `gh pr merge`); leaves the fixed comment
+    `"Closed by AgentGuard rollback."` so a reviewer sees why.
+  - **`git push origin --delete <branch>`** - removes a branch ref on
+    the remote. Not `--force`, not a history rewrite.
+  - **Reviewed revert** - the *post*-merge undo: a human opens a new PR
+    that applies `git revert` (a new commit inverting the change) and
+    merges it through normal review. AgentGuard never does this.
+  - **`ROLLED_BACK`** - the terminal workflow state reached only from
+    `DRAFT_PR_CREATED`. `workflow.record_terminal_state()` writes the
+    matching `workflow_rolled_back` audit event so the trail is never
+    silent about a reversal.
+- **What the three demonstration tests show** (`tests/test_rollback.py`,
+  Day 10 Lab 4 section):
+  - `test_close_the_loop_from_draft_pr_to_rolled_back` - the full story:
+    workflow at `DRAFT_PR_CREATED` -> `rollback_plan(REPO, 7,
+    "agentguard/wf-demo01", merged=False)` returns exactly the two
+    commands (`gh pr close 7 ... --comment "Closed by AgentGuard
+    rollback."`, then `git push origin --delete agentguard/wf-demo01`)
+    -> a human runs them -> `record_terminal_state(db, state,
+    "ROLLED_BACK", reason=..., details={"pr_number": 7, "branch": ...})`
+    -> state is `ROLLED_BACK` and the one audit row is
+    `workflow_rolled_back` with payload `{pr_number, branch, reason}`.
+  - `test_once_a_draft_pr_is_open_the_only_recorded_ending_is_rolled_back`
+    - `ALLOWED_TRANSITIONS["DRAFT_PR_CREATED"]` is `{"ROLLED_BACK"}`, so
+    recording `FAILED` or `REJECTED` from there raises `ValueError` and
+    writes nothing; only `ROLLED_BACK` succeeds. Once a draft PR is open,
+    a rollback is the *only* recordable ending.
+  - `test_rolling_back_a_merged_draft_is_refused_at_the_plan_step` -
+    `rollback_plan(..., merged=True)` raises "refused after merge" and
+    returns no command; the loop is not closed automatically.
+- **The manual rollback runbook** (run **in the demo-repo clone**,
+  `~/Developer/AgentGuard/01-Working/agentguard-remediation-demo`, never
+  in `agentguard-v4`; nothing here was executed this session - there is
+  no live PR yet):
+  1. `gh pr close <n> --repo justintinlei/agentguard-remediation-demo
+     --comment "Closed by AgentGuard rollback."` - close, do not merge.
+  2. `git push origin --delete agentguard/<wf>` - delete the feature
+     branch on the remote.
+  3. Record the ending: `record_terminal_state(<audit.db>,
+     WorkflowState("<wf>", "DRAFT_PR_CREATED"), "ROLLED_BACK",
+     reason="draft PR #<n> closed and branch deleted",
+     details={"pr_number": <n>, "branch": "agentguard/<wf>"})`.
+  4. On github.com: confirm the PR shows **"Closed"**, *not* "Merged",
+     and the `agentguard/<wf>` branch is gone. Screenshot it.
+  The commands `rollback_plan` builds are exactly these two - the
+  runbook is just running the reviewed plan by hand.
+- **What was inspected but not changed.** `rollback.py` - complete since
+  Day 8 (keyword-only required `merged`, bool-type check, Day 7 allowlist
+  validators on repo + branch, positive-int `pr_number`). It imports no
+  `subprocess` and has **no executor** by design - a test
+  (`test_rollback_module_never_imports_subprocess`) pins that; the two
+  commands are run by hand. Adding an executor would break that test and
+  is out of scope. `docs/v4_github_demo_setup.md` already states the rule
+  ("Rollback before merge only ... after a merge, v4 refuses automatic
+  rollback and requires a reviewed revert") - no change.
+- **Drift noticed, deferred to Lab 5.** `docs/v4_architecture.md` sketches
+  a `DRAFT_PR_CREATED -> FAILED` arrow that `workflow.py` does not
+  implement (the only arrow out is `-> ROLLED_BACK`). The new
+  "only-recorded-ending" test documents the *real* behavior; reconciling
+  the doc is Day 10 Lab 5.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `rollback.py` is a ~10-line stub (positional `merged`, no allowlist
+  validation, no comment constant). This repo's version is already well
+  ahead of it, and the starter likewise runs the rollback commands
+  manually with no executor - so there was nothing to copy for this lab;
+  the end-to-end demonstration is the deliverable.
+- **Input / processing / output / security boundary.** Input: the
+  allowlisted demo repo, a PR number, the `agentguard/<id>` branch, and
+  the required keyword-only `merged` flag. Processing: `rollback_plan`
+  checks `merged` first (non-bool or `True` -> raise), then validates
+  repo / branch / number, then returns two token-list commands;
+  separately `record_terminal_state` moves `DRAFT_PR_CREATED ->
+  ROLLED_BACK` through the pure `transition()` guard and appends one
+  audit row. Output: two review commands (data, not actions), a
+  `ROLLED_BACK` state + `workflow_rolled_back` event, three new tests,
+  this runbook. Security boundary: `rollback.py` runs nothing (no
+  `subprocess`); every argument passes the same Day 7 allowlist
+  validators `create_plan` uses; the branch delete can only ever target
+  an `agentguard/` branch, never `main`; `merged=True` fails closed
+  (refuse, produce nothing); the state machine permits only
+  `DRAFT_PR_CREATED -> ROLLED_BACK`; no AI in the path.
+- **Verification.**
+  - `python -m pytest -q tests/test_rollback.py` -> `46 passed`
+    (43 + the 3 new demonstration tests).
+  - `python -m pytest -q` -> `866 passed` (863 + 3), no regression.
+  - `python scripts/run_release_gate.py` -> ends
+    `RELEASE GATE PASS for AgentGuard v4`.
+  - `python -m compileall -q .` -> clean (exit 0).
+  - `git status --short` -> only `tests/test_rollback.py` and
+    `notes/learning_log.md` changed. `git branch` -> still only `main` +
+    `v4-development`. Demo repo -> clean on `main`, untouched.
+- **Why this lab exists.** A remediation system that can open a change
+  but not cleanly reverse it is only half-trustworthy. v4's answer is
+  that a pre-merge rollback is two reversible, reviewed commands plus an
+  audit record - and that a *post*-merge undo is explicitly out of scope
+  for automation, because rewriting shared history is exactly the kind of
+  unilateral action the whole design refuses. Demonstrating the loop end
+  to end - open, then safely close - is what shows the workflow always
+  has a clean, recorded ending.
+- **What this lab did not do.** No change to `rollback.py` (no executor;
+  complete since Day 8). No live `gh pr close` / `git push --delete`
+  (there is no live PR). No new `docs/` files (Labs 5 / 7 / 8). No change
+  to `README.md` / `START_HERE.md` / `evidence/README.md` /
+  `docs/v4_architecture.md` / `scripts/*` / `tests/test_docs_consistency.py`
+  (Lab 5). No commit, push, PR, tag, API spend, or live external action.
+
+## Day 10, Lab 5 — Finalize README, architecture, threat model, test report
+
+- **The idea.** The code has been done for days; what was still v3 is the
+  **paperwork** - the files a reviewer, interviewer, or auditor reads
+  first. `README.md` / `START_HERE.md` / `VERSION.txt` still said
+  "AgentGuard v3 - MCP Connected Discovery"; `docs/v4_architecture.md`
+  was stamped "Status: design, decided on Day 1" and its state diagram
+  had drifted from `workflow.py`; there was no `docs/v4_threat_model.md`.
+  `tests/test_docs_consistency.py` actively **pinned the v3 language in
+  place** - it is why Days 1-4 could not touch these files. This lab
+  re-orients the entry docs to v4 "as built", writes the v4 threat
+  model, reconciles the architecture doc with the code, folds a real
+  test report into the README, and rewrites the doc-consistency test to
+  guard the *v4* docs while keeping the frozen v3 docs finalized.
+- **New terms:**
+  - **"As built" vs "as designed"** - a design doc describes intended
+    behaviour before code; an as-built doc describes what the code
+    actually does, verified against it.
+  - **Doc drift / reconciliation** - a document and its code disagreeing.
+    `docs/v4_architecture.md` drew `APPROVED → REJECTED` and
+    `DRAFT_PR_CREATED → FAILED` arrows and a "returns to PROPOSED" line
+    that `workflow.ALLOWED_TRANSITIONS` never had. Reconciliation = edit
+    the doc to match the authoritative code
+    (`workflow.py` / `docs/v4_state_machine.md`).
+  - **Threat model** - a structured list of abuse cases, each with the
+    *attack*, the *control* that blocks it, and the *test* that proves
+    the control. `docs/v3_threat_model.md` is the house template.
+  - **Test report / release-gate summary** - the reproducible numbers a
+    reader re-runs to check every claim (test count, eval results, the
+    one-command gate result). Here: a README section, not a new file
+    ("do not invent a different filename"; the repo does have
+    `docs/v2_evaluation_report.md` as precedent, but this stays in the
+    README by the user's choice).
+  - **Doc-consistency test** - `tests/test_docs_consistency.py`:
+    source-string asserts (like `tests/test_ci_workflow.py`) that fail
+    the build if "planned / not yet" language returns or a doc link
+    dangles.
+- **What changed, file by file.**
+  - `README.md` - retitled **AgentGuard v4 - Governed Remediation MVP**;
+    the invariant, the end-to-end flow, the six trust boundaries, a
+    **"Release gate & test report"** table (80 labs; 866 unit tests; v2
+    3/3; v3 6 categories; v4 10/10 "fails closed";
+    `RELEASE GATE PASS for AgentGuard v4`), an "Inherited v2/v3 baseline
+    (frozen)" section, and a "Learn more" list linking **only files that
+    exist now** (no link to the Lab 7 interview brief / Lab 8 backlog).
+  - `START_HERE.md` - v4 navigation + the invariant to protect (5
+    read-only MCP tools, 3 allowlisted templates, `scanner.py` sole
+    score authority, dry-run / draft-only, no merge command).
+  - `VERSION.txt` - `AgentGuard v4 - Governed Remediation MVP`.
+  - `docs/roadmap.md` - v3 -> "done, frozen"; v4 -> "this project, Day
+    1-10, released" with its real finish line.
+  - `docs/v4_architecture.md` - status header -> "as built - finalised
+    Day 10 Lab 5"; removed the two drifted arrows and the "back to
+    PROPOSED" prose; "every transition writes an audit event" -> "the
+    orchestrator records each step; `transition()` is a pure guard"
+    (matching `docs/v4_state_machine.md`); added a **"How this is
+    verified"** section mapping each claim to a test file; the invariant
+    paragraph kept verbatim.
+  - `docs/v4_threat_model.md` - **new**, in the v3 house style (per
+    category: Attack / Control / Proven by). Nine categories - arbitrary
+    model patch, stale approval, direct production write, repo/branch/path
+    injection, bypassed verification, unreviewed merge, post-merge
+    rollback, audit tampering, secret leakage - each citing the real
+    control and the test/eval, tied to `evals/run_v4_evals.py`'s 10
+    injections. Ends with four **accepted residual risks** (the app's
+    event timeline is in-memory not the SQLite audit DB - `v4_service`
+    deferred; single-reviewer approval / no RBAC; unbounded parse carried
+    from v3; local-only trust in `gh`/`git`).
+  - `tests/test_docs_consistency.py` - rewritten: 15 tests. v4
+    README/START_HERE finalized (no stale phrases, name `app_v4.py` and
+    `RELEASE GATE PASS for AgentGuard v4`, links resolve, the 5 tool
+    names present); `docs/v4_architecture.md` is as-built and drift-free
+    (no "Status: design", no drawn `APPROVED → REJECTED` /
+    `DRAFT_PR_CREATED → FAILED`); `docs/v4_threat_model.md` has 9
+    numbered categories + residual risks + names the real controls; and
+    the **frozen v3 guards stay** - `docs/v3_architecture.md` /
+    `docs/v3_threat_model.md` (7 categories) / `docs/v3_to_v4_handoff.md`
+    keep their finalized language.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `README.md` / `docs/v4_architecture.md` / `docs/v4_threat_model.md` are
+  thin (the threat model is two sentences; the architecture is one
+  paragraph). This repo's v2/v3 docs are far richer, so the v4 docs were
+  written to that depth and voice, using the starter only to confirm the
+  concept list and the end-to-end flow. The starter has no
+  `tests/test_docs_consistency.py` at all.
+- **Reconciliation source of truth.** Where the Day-1 sketch and the
+  code disagreed, the code won. `docs/v4_state_machine.md` (already
+  correct, unchanged) is the canonical transition map;
+  `docs/v4_architecture.md` now defers to it and adds the per-state
+  authority table and the trust boundaries.
+- **Input / processing / output / security boundary.** Input: the
+  authoritative code (`workflow.py`, the release gate, the eval scripts)
+  and the v3-oriented docs. Processing: rewrite the entry docs to v4,
+  reconcile the architecture doc, write the threat model, fold a test
+  report into the README, rewrite the doc-consistency test. Output: a
+  repo whose front-door docs accurately describe a governed remediation
+  MVP, with the test enforcing it. Security boundary: documentation only
+  - the sole `.py` touched is `tests/test_docs_consistency.py` (source
+  strings, no runtime behaviour). Every written claim maps to a
+  re-runnable command. No `/Users/...` machine path in any doc
+  (`validate_starter_kit.py` would fail the gate); no secret shape
+  (`check_no_secrets.py` scans `.md`). The invariant paragraph is
+  preserved word for word.
+- **Verification.**
+  - `python -m pytest -q tests/test_docs_consistency.py` -> `15 passed`
+    (was 13; +2 net after the rewrite).
+  - `python -m pytest -q` -> `868 passed` (866 + 2), no regression.
+  - `python scripts/run_release_gate.py` -> `RELEASE GATE PASS for
+    AgentGuard v4` (its `validate_starter_kit.py` step re-scans every
+    tracked `.md` for author-machine paths - clean).
+  - `python -m compileall -q .` -> clean.
+  - `git status --short` -> `README.md`, `START_HERE.md`, `VERSION.txt`,
+    `docs/roadmap.md`, `docs/v4_architecture.md`, `docs/v4_threat_model.md`,
+    `tests/test_docs_consistency.py`, `notes/learning_log.md`.
+    `git branch` -> only `main` + `v4-development`.
+- **Why this lab exists.** The learning goal is "how documentation turns
+  code into an enterprise product case study" - and it is literal. The
+  same repo reads as a student exercise or as a credible security MVP
+  depending entirely on whether the docs state the trust model, name
+  every threat and the deterministic control that blocks it, and point
+  at reproducible evidence. An interviewer or a security reviewer reads
+  the README and the threat model before they read a line of code; if
+  those say "v3, planned" the code never gets a fair look.
+- **What this lab did not do.** Did not create
+  `docs/final_mvp_interview_brief.md` (Lab 7) or `docs/post_mvp_backlog.md`
+  (Lab 8) - the README does not link them yet. No change to
+  `evidence/README.md` (the v4 final evidence package is Lab 6), to
+  `CLAUDE.md` (project instructions, not test-checked), to any engine
+  `.py`, or to `scripts/*`. No commit, push, PR, tag, API spend, or live
+  external action.
+
+## Day 10, Lab 6 — Final evidence package and five-minute video plan
+
+- **The idea.** Lab 5 finalized the *prose* docs. This lab produces the
+  **evidence package**: the exact set of screenshots and pasted terminal
+  output that proves every claim, plus a rehearsable five-minute demo /
+  video script - all written so a demo can be given, recorded, or shared
+  **without exposing a credential**. `evidence/README.md` already carries
+  this for v1/v2/v3; this lab adds the two v4 closing sections in the
+  same house style, adapted to the governed-remediation workflow.
+- **The learning goal, literally.** "How to show the system without
+  exposing credentials" is security content, not stage direction. A demo
+  of a system that touches GitHub is exactly where a secret ends up on a
+  shared screen or in a recording. The package opens with a
+  **credential-safety checklist** naming what must never be in any
+  screenshot, paste, or video frame:
+  - a `.env` file (open, or shown by `cat` / `ls -la`) - it holds the
+    optional `ANTHROPIC_API_KEY`;
+  - any `ANTHROPIC_API_KEY=...` line or `env` / `printenv` dump;
+  - any `sk-ant-...`, `github_pat_...`, or `gh?_<token body>` string;
+  - the `Token:` line from `gh auth status` (capture the app's `gh auth`
+    panel instead - it strips that line via `_strip_token_lines`);
+  - `~/.config/gh/` or `~/.ssh/` contents;
+  - a browser password manager / autofill dropdown / "save password"
+    prompt;
+  - shell history or scrollback containing any of the above.
+- **New terms:**
+  - **Evidence package** - a folder (`evidence/`) plus an index
+    (`evidence/README.md`) where each entry is a reproducible command or
+    a screenshot spec, the expected result, and a filename to save it as.
+    Proof, not prose.
+  - **Three-layer capture** - "it works" is three separable claims that
+    can fail independently: the **protocol** boundary is real (MCP
+    Inspector), the **product** behaves (`streamlit run app_v4.py`), the
+    **verification** passes (tests / evals / gate). Each gets its own
+    evidence.
+  - **Cross-layer check** - one fact seen multiple ways:
+    `shasum -a 256 connected_environment/agents.json` must equal the
+    `source_sha256` in the Inspector response *and* the Source SHA-256
+    the app shows. Proves the layers describe one system.
+  - **Five-minute demo / video plan** - a beat-by-beat script (time / do
+    / say) that *proves the trust model* under 5:00, with fallbacks for a
+    live failure and a "what NOT to claim" list.
+  - **Redaction by construction** - the app can *show* "GitHub
+    authenticated" while displaying no token, because the panel strips
+    the credential line before render. The safest demo surface is one
+    that cannot leak.
+- **What the two new sections contain.**
+  - *Final evidence capture* - credential-safety checklist first; then
+    Layer 1 (Inspector: five read-only tools, `health_check` ->
+    `mode: "read-only"`, `tool_count: 5`), Layer 2 (the v4 app: boundary
+    + journey map -> build proposal for *Customer Support Agent* +
+    `REQUIRE_HUMAN_APPROVAL` -> approve & verify showing the two hashes,
+    the `ApprovalRecord`, `Verification PASSED (10/10)`, HIGH 2 -> 1, the
+    `PROPOSED -> APPROVED -> VERIFIED` timeline -> the five `DRY_RUN`
+    commands -> the token-free `gh auth` panel), Layer 3 (`pytest -q` ->
+    868; v2 3/3; v3 suite; v4 `10 of 10 checks held (fails closed)`;
+    `RELEASE GATE PASS for AgentGuard v4`), and the cross-layer SHA-256
+    check. Each item names a `evidence/day10-v4-*.png` filename.
+  - *Five-minute demo* - "Before you start" (the checklist, tersely), a
+    six-beat 0:00-5:00 table (problem -> finding -> proposal + two hashes
+    -> human approval bound to both + isolated verification -> dry-run
+    plan, no merge command -> `run_release_gate.py`), "If something
+    breaks" fallbacks, and "What NOT to claim" (synthetic local demo;
+    the AI never approves/applies/verifies/scores; draft-only, no merge
+    in the code; no autonomous remediation).
+- **Also changed.** `tests/test_docs_consistency.py` - added `EVIDENCE`
+  and two tests: the two new headings + the three layer names +
+  `app_v4.py` + `RELEASE GATE PASS for AgentGuard v4` +
+  `10 of 10 checks held` + the credential-safety content are present and
+  no stale phrases; every `scripts|evals|docs|tests/...` path named
+  anywhere in `evidence/README.md` resolves on disk.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `evidence/README.md` is a 250-byte stub ("Save screenshots here. Do
+  not store secrets." + five suggested filenames). Nothing to copy - the
+  v3 "Day 10: Final evidence capture" / "five-minute demo" sections in
+  *this* repo are the template, adapted here to the v4 workflow. The
+  starter's `docs/final_mvp_interview_brief.md` has a "Five-minute demo"
+  list, but that file is Day 10 Lab 7's deliverable; the v4 course (like
+  v3) puts the demo script in `evidence/README.md`.
+- **Input / processing / output / security boundary.** Input: the
+  finished, verified v4 system (868 tests, gate green) and the v3
+  evidence sections as a template. Processing: write the two v4 sections
+  into `evidence/README.md`; add the evidence guards to
+  `tests/test_docs_consistency.py`. Output: a complete reproducible
+  evidence index and a rehearsable demo plan, both written so a recording
+  exposes no secret. Security boundary: documentation only - no engine
+  `.py` touched (the sole `.py` is the source-string doc test). Every
+  command the package lists is read-only or mock-mode. The new text
+  contains no `/Users/...` path (`validate_starter_kit.py` re-scans every
+  tracked `.md` - `NO LOCAL PATHS`) and no real token shape
+  (`check_no_secrets.py` scans `.md` - `SECRET CHECK PASS`). No
+  screenshot is actually taken here.
+- **Verification.**
+  - `python -m pytest -q tests/test_docs_consistency.py` -> `17 passed`
+    (was 15; +2).
+  - `python -m pytest -q` -> `870 passed` (868 + 2), no regression.
+  - `python scripts/run_release_gate.py` -> `RELEASE GATE PASS for
+    AgentGuard v4`.
+  - `python -m compileall -q .` -> clean.
+  - `git status --short` -> `evidence/README.md`,
+    `tests/test_docs_consistency.py`, `notes/learning_log.md`.
+    `git branch` -> only `main` + `v4-development`.
+- **Why this lab exists.** A portfolio project is judged on the demo, and
+  a demo of a security tool that leaks a credential on screen fails on
+  its own terms - it just proved the operator can't be trusted with
+  secrets. Writing the evidence checklist and the demo script *ahead of
+  recording* - naming every command's expected output and every thing
+  that must not be visible - is how the recording becomes safe to share
+  with a hiring panel or a design partner. It also forces the trust
+  story into a five-minute shape: finding, bounded proposal, exact-hash
+  approval, isolated verification, draft-only delivery, one-command
+  proof.
+- **What this lab did not do.** Did not create
+  `docs/final_mvp_interview_brief.md` (Lab 7) or `docs/post_mvp_backlog.md`
+  (Lab 8). No change to `README.md` / `START_HERE.md` / `docs/v4_*.md` /
+  `scripts/*` / any engine `.py`. No screenshots taken (the user's manual
+  step). No commit, push, PR, tag, API spend, or live external action.
+
+## Day 10, Lab 7 — Deep technical and product interview answers
+
+- **The idea.** An MVP that cannot be *explained* is a folder of code, not
+  a portfolio piece. This lab creates `docs/final_mvp_interview_brief.md`
+  - a Q&A document answering the questions a technical or product
+    interviewer actually asks, each answer grounded in a real file and
+    function in this repo (not a generic description). The lab's learning
+    goal names the exact topics it must cover, and together they are a
+    tour of the whole system: **identity, policy, MCP, RAG, guardrails,
+    approvals, verification, audit, rollback**.
+- **The brief - 11 questions.** One-sentence product + the v1->v4 arc
+  (what each version added, what `scanner.py` kept); identity (the
+  `identity` / `owner` fields, `AG-005`, `list_agent_ownership`,
+  `ASSIGN_OWNER`); policy (`policies/` + `policy_library.py` - real text,
+  hash-traceable chunks); MCP (host / client / server / tool / STDIO
+  transport; exactly five read-only tools; no sixth write tool); RAG +
+  grounding (`retrieval.retrieve` selects chunks;
+  `grounding.validate_grounding` rejects an explanation whose score
+  differs from the scanner or whose citation isn't in a retrieved chunk);
+  guardrails (three deterministic templates, the `github_plan` and
+  `workflow` allowlists; allowlist fails safe); approvals
+  (`proposal_hash.canonical_json` + `sha256_value`; `approval.decide`
+  binds to *both* the proposal hash and the source hash;
+  `validate_approval` rejects a stale approval -> `FAILED`); verification
+  (approval = intent, verification = correctness; `verifier.verify` on an
+  isolated copy, 10 checks incl. "HIGH count did not increase";
+  `require_verified` blocks GitHub planning); audit (SQLite
+  `workflow_events`, append-only, ordered by `id`;
+  `record_terminal_state` records every non-success ending); rollback
+  (pre-merge = two reversible commands; `rollback_plan(merged=True)`
+  refuses); the invariant + honest limitations (local synthetic demo;
+  in-memory UI timeline vs the durable audit DB; single reviewer / no
+  RBAC; no autonomous remediation). Closes with a "what this proves about
+  the builder" list and a one-paragraph interview answer.
+- **New terms** (the topics, defined for the interview):
+  - **Identity** - which agent, and who owns it. `AG-005` flags an
+    unowned agent; `list_agent_ownership` discovers ownership separately
+    so a reviewer can cross-check.
+  - **Policy** - the written rules an explanation must cite, loaded by
+    `policy_library.py` as hash-traceable chunks. Never summarised into
+    the model's weights; retrieved fresh per finding.
+  - **RAG** - retrieve the relevant policy passages, then have the model
+    explain *using only those*. `retrieval.retrieve`.
+  - **Grounding** - the check that the model stayed on the evidence.
+    `grounding.validate_grounding` rejects a changed score or an
+    unretrieved citation.
+  - **Guardrail** - a deterministic limit: three allowlisted templates,
+    the repo/branch/path allowlist, the transition allowlist. Allowlist,
+    not denylist - anything not explicitly permitted is refused.
+  - **Approval binding** - `decide()` ties the `ApprovalRecord` to the
+    SHA-256 of both the proposal and the source, so it cannot be replayed
+    against a modified version.
+  - **Verification** - software confirming correctness on an isolated
+    copy, as distinct from a human confirming intent.
+  - **Audit (append-only)** - `audit_db.py` has no UPDATE/DELETE path;
+    `id` (not timestamp) is the ordering key; every ending is recorded.
+  - **Rollback (pre- vs post-merge)** - pre-merge is reversible and
+    automated; post-merge needs a reviewed `git revert` and is refused.
+- **Also changed.** `README.md` - one line in "Learn more" linking the
+  new brief (it was otherwise an unlinked doc).
+  `tests/test_docs_consistency.py` - added `INTERVIEW` and two tests: the
+  brief is non-trivial, is Q&A format (>= 9 `**Q:`), covers every
+  learning-goal topic as a lowercased substring, names the real code
+  (`scanner.py`, `remediation_templates`, `validate_approval`,
+  `require_verified`, `record_terminal_state`, `rollback_plan`), restates
+  the invariant, and has no stale phrases; and the README links it.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `docs/final_mvp_interview_brief.md` is a thin bulleted outline (a
+  one-sentence product, a 10-step flow, a "what this proves" list, a
+  canned answer). Its concept list and closing paragraph were kept and
+  rewritten in this repo's voice; the depth - a grounded answer per topic
+  citing the file that makes it true - follows `docs/v3_interview_brief.md`
+  instead.
+- **Input / processing / output / security boundary.** Input: the
+  finished, verified v4 codebase and the v2/v3 briefs as the style
+  template. Processing: write the Q&A brief with every answer citing real
+  code; add one README link; add the doc-consistency guard. Output: an
+  interview-ready explanation document (and a study sheet). Security
+  boundary: documentation only - the sole `.py` touched is the
+  source-string doc test. The brief contains no `/Users/...` path
+  (`validate_starter_kit.py` -> `NO LOCAL PATHS`) and no real token shape
+  (`check_no_secrets.py` -> `SECRET CHECK PASS`). It restates the
+  invariant and the honest limitations verbatim.
+- **Verification.**
+  - `python -m pytest -q tests/test_docs_consistency.py` -> `19 passed`
+    (was 17; +2).
+  - `python -m pytest -q` -> `872 passed` (870 + 2), no regression.
+  - `python scripts/run_release_gate.py` -> `RELEASE GATE PASS for
+    AgentGuard v4`.
+  - `python -m compileall -q .` -> clean.
+  - `git status --short` -> `docs/final_mvp_interview_brief.md` (new),
+    `README.md`, `tests/test_docs_consistency.py`, `notes/learning_log.md`.
+    `git branch` -> only `main` + `v4-development`.
+- **Why this lab exists.** Enterprise AI security is judged on whether the
+  builder can articulate *how* each control works and *why* the boundary
+  holds - "we have human approval" is worth nothing next to "the approval
+  is a SHA-256 binding to both the proposal and the source, and it fails
+  closed if either drifts". Writing the answers down, grounded in the
+  code, is how the project becomes defensible in a room: every claim maps
+  to a file, a function, and a test.
+- **What this lab did not do.** Did not create `docs/post_mvp_backlog.md`
+  (Day 10 Lab 8). No change to `START_HERE.md` / `docs/v4_*.md` /
+  `evidence/README.md` / `scripts/*` / any engine `.py`. No commit, push,
+  PR, tag, API spend, or live external action.
+
+## Day 10, Lab 8 — Post-MVP backlog and job-search integration
+
+- **The idea.** The last lab of the course. It creates
+  `docs/post_mvp_backlog.md` - two things in one file (the named path):
+  (1) the engineering work a real next version would do, each item with
+  *why it is deliberately outside the MVP*; (2) how the finished
+  prototype turns into résumé bullets, a LinkedIn blurb, a portfolio
+  entry, and a per-role interview map. The learning goal is exactly that
+  second half - "how the completed prototype supports resume, LinkedIn,
+  portfolio, and targeted interviews". Naming the gaps is a senior signal,
+  not a weakness: "here is what I would build next and the trade-off I
+  made to leave it out."
+- **New terms:**
+  - **Post-MVP backlog** - a prioritised list of work *not* done in the
+    minimum viable product, each item with a rationale for deferral. The
+    forward-looking twin of the threat model's "accepted residual risks".
+  - **MVP scope boundary** - the deliberate line between "enough to
+    demonstrate the idea and its safety story" and "production-ready".
+    Everything past the line is named, not hidden.
+  - **STAR bullet** - a résumé bullet as Situation/Task -> Action ->
+    Result, quantified where possible.
+  - **Targeted-interview map** - a table pairing a role/topic with the
+    repo artifact to open and the backlog item to raise, so prep is
+    role-specific.
+  - **RBAC / separation of duties** - permissions by role, plus "the
+    proposer cannot be the approver". AgentGuard records one free-text
+    reviewer name today - the headline backlog item.
+  - **Tamper-evident audit** - rows signed or hash-chained so a later
+    edit is detectable (today: append-only *by convention*, no
+    UPDATE/DELETE code path).
+- **What the doc contains.** Part 1 groups the backlog - Identity & auth
+  (approval RBAC, workload identity, authenticated *remote* MCP),
+  Discovery (continuous, real connectors, bounded streaming), Policy &
+  explanation (a versioned rules engine, broader evals), Approval & audit
+  (wire the durable SQLite trail into the UI via a `v4_service`
+  orchestrator; tamper-evident events), Delivery & rollback (a reviewed
+  post-merge `git revert` flow; more templates behind the same
+  allowlist), Operability (multi-tenancy, hardening, observability,
+  scale, compliance), Validation (design-partner pilots) - and closes
+  with **"What stays fixed no matter what"**: the invariant and the
+  allowlist-not-denylist posture; a backlog item that would weaken either
+  is rejected, not scheduled. Part 2 is the job-search material - 5
+  honest quantified résumé bullets, a LinkedIn blurb, a portfolio
+  one-liner + a link table (repo / README / threat model / interview
+  brief / evidence / demo, each with what it shows), a targeted-interview
+  map (AI-safety, platform, security, AI product, backend), and a "what
+  NOT to claim" list.
+- **Also changed.** `README.md` - one line in "Learn more" linking the
+  backlog. `tests/test_docs_consistency.py` - added `BACKLOG` and two
+  tests: the doc is non-trivial, names concrete deferred items (`rbac`,
+  `remote`, `v4_service`, `tamper`), has the job-search content
+  (`linkedin`, `portfolio`, `interview`, `job-search`), restates the
+  invariant and the allowlist posture, and has no stale phrases; the
+  README links it.
+- **Deviation from the starter (compared, not copied).** The starter's
+  `docs/post_mvp_backlog.md` is one sentence - a comma-list of 11
+  next-work items. That list of directions was kept, but each item was
+  expanded with *why it is deferred* and a rough approach, and the
+  entire job-search half is this repo's addition (the starter has none).
+  The honest-limitations framing borrows from the starter's
+  `docs/product_and_market_positioning.md`.
+- **Input / processing / output / security boundary.** Input: the
+  finished v4 codebase, the accepted-residual-risks in the threat model,
+  and the real verification state (874 tests, gate green, Docker
+  non-root, CI on push). Processing: write the backlog + job-search doc;
+  add one README link; add the doc-consistency guard; write this entry +
+  the Day 10 summary. Output: an interview-and-application working
+  document and a closed course record. Security boundary: documentation
+  only - the sole `.py` touched is the source-string doc test. The doc
+  uses `~/` paths only, contains no real token shape, and uses
+  **placeholders** for name / links / contact details (no real personal
+  data committed). It restates the invariant so the backlog cannot be
+  read as "these safety limits are temporary".
+- **Verification.**
+  - `python -m pytest -q tests/test_docs_consistency.py` -> `21 passed`
+    (was 19; +2).
+  - `python -m pytest -q` -> `874 passed` (872 + 2), no regression.
+  - `python scripts/run_release_gate.py` -> `RELEASE GATE PASS for
+    AgentGuard v4`.
+  - `python -m compileall -q .` -> clean.
+  - `git status --short` -> `docs/post_mvp_backlog.md` (new), `README.md`,
+    `tests/test_docs_consistency.py`, `notes/learning_log.md`.
+    `git branch` -> only `main` + `v4-development`.
+- **Why this lab exists.** A prototype only pays off if it can be turned
+  into evidence for a job. The backlog shows the builder understands
+  where the MVP stops and what real production work looks like; the
+  job-search section makes that legible on a résumé, a profile, and in a
+  role-specific interview. Being explicit about the limits is also the
+  security lesson repeated once more - the same honesty the threat model
+  and the "what NOT to claim" lists apply to the product applies to how
+  you talk about it.
+- **What this lab did not do.** No change to `START_HERE.md` /
+  `docs/v4_architecture.md` / `docs/v4_threat_model.md` /
+  `docs/final_mvp_interview_brief.md` / `evidence/README.md` /
+  `scripts/*` / any engine `.py`. No commit, push, PR, tag, API spend, or
+  live external action.
+
+## Day 10 Summary — Labs 1 through 8
+
+1. **Run the complete v4 release gate** - wired
+   `python evals/run_v4_evals.py` into `scripts/run_release_gate.py`
+   (after the v3 eval, before the secret scan) and pinned it with
+   `tests/test_run_release_gate.py`. One command now proves all inherited
+   *and* v4 controls: `RELEASE GATE PASS for AgentGuard v4`.
+2. **Run the full local browser scenario** - a new end-to-end test in
+   `tests/test_app_v4.py` walks the *real* `connected_environment/agents.json`
+   through `load_environment` -> `approve_and_verify` -> `github_dry_run_plan`
+   (Customer Support Agent -> `REQUIRE_HUMAN_APPROVAL` -> VERIFIED, HIGH
+   count 2 -> 1 -> five `DRY_RUN` commands); the app boots headless with
+   HTTP 200.
+3. **Optionally create one draft PR** - added
+   `github_plan.write_pr_body(target_dir, **fields)` (the missing wiring:
+   renders `render_pr_body()` output to `.agentguard/pr_body.md` in the
+   demo-repo working tree), gitignored `.agentguard/`, updated
+   `docs/v4_github_demo_setup.md`, wrote the manual runbook. **The live
+   PR was not created.**
+4. **Demonstrate rollback of the unmerged draft** - three narrative tests
+   in `tests/test_rollback.py`: the full loop
+   (`rollback_plan(merged=False)` -> `record_terminal_state("ROLLED_BACK")`
+   -> the `workflow_rolled_back` audit row); the state machine allows
+   *only* `DRAFT_PR_CREATED -> ROLLED_BACK`; `merged=True` is refused at
+   the plan step.
+5. **Finalize README / architecture / threat model / test report** -
+   `README.md` / `START_HERE.md` / `VERSION.txt` / `docs/roadmap.md`
+   re-oriented to v4 "as built" with a real test-report section;
+   `docs/v4_architecture.md` reconciled with `workflow.py` (dropped the
+   two drifted arrows, fixed the audit-event claim, added "How this is
+   verified"); **new `docs/v4_threat_model.md`** (9 categories, each
+   Attack / Control / Proven by, + accepted residual risks);
+   `tests/test_docs_consistency.py` rewritten to guard the v4 docs while
+   keeping the frozen v3 docs finalised.
+6. **Final evidence package + five-minute video plan** - two v4 sections
+   in `evidence/README.md`: a three-layer capture checklist
+   (protocol / product / verification) opening with a **credential-safety
+   checklist** (nothing on screen may be a `.env`, a key, a token, the
+   `gh auth status` token line), and a rehearsable six-beat 0:00-5:00
+   demo script; evidence guards added to `tests/test_docs_consistency.py`.
+7. **Deep technical + product interview answers** - new
+   `docs/final_mvp_interview_brief.md`: 11 grounded Q&A covering identity,
+   policy, MCP, RAG + grounding, guardrails, approvals, verification,
+   audit, rollback - each answer citing the real file/function - plus a
+   "what this proves about the builder" list and a one-paragraph answer;
+   linked from the README and guarded by a test.
+8. **Post-MVP backlog + job-search integration** - new
+   `docs/post_mvp_backlog.md`: the grouped next-version backlog (each item
+   with why it is deferred) closing on the fixed invariant, plus résumé
+   bullets, a LinkedIn blurb, a portfolio link table, and a
+   targeted-interview map; linked from the README and guarded by a test.
+   This summary.
+
+**Where Day 10 leaves off - the course is complete.** AgentGuard v4 - the
+Governed Remediation MVP - is finished and fully verified. The full
+workflow (discover -> scan -> propose from one of three allowlisted
+templates -> hash source + proposal -> human APPROVE/REJECT bound to both
+hashes -> isolated verification, HIGH count must not rise -> dry-run plan
+or one draft-only PR -> append-only SQLite audit -> pre-merge rollback)
+runs deterministically in mock/dry-run mode from the venv
+(`streamlit run app_v4.py`) and as a non-root container
+(`docker compose up`). `python -m pytest -q` is at **874 passed** (855 at
+the end of Day 9 -> +19 across Day 10; 684 at the end of Day 7);
+`python scripts/run_release_gate.py` ends `RELEASE GATE PASS for
+AgentGuard v4` - now running `validate_starter_kit.py` (80 labs, 5
+read-only MCP tools, no author machine paths), the full unit suite, the
+v2 / v3 / **v4** evaluation suites, and the secret scan;
+`python -m compileall -q .` is clean; CI runs the same on every push
+(Python 3.14). All entry-point and reference docs are finalised for v4
+(`README.md`, `START_HERE.md`, `VERSION.txt`, `docs/roadmap.md`,
+`docs/v4_architecture.md` reconciled with the code, new
+`docs/v4_threat_model.md`, `docs/final_mvp_interview_brief.md`,
+`docs/post_mvp_backlog.md`), and `evidence/README.md` carries the v4
+capture checklist and the five-minute demo script. The invariant held
+end to end: deterministic rules decide *what*, software verifies, a human
+approves *intent*, the AI layer only explains and proposes, and
+`scanner.py` is the sole authority for the risk score - v1 through v4
+unchanged. `git branch` is still only `main` + `v4-development`, and
+everything since the Day 1 baseline commit `517db77` is **uncommitted**
+on `v4-development` - committing the course is a separate decision.
+Outstanding manual follow-ups, all optional and the user's to run:
+record the five-minute demo (Lab 6 checklist), run the one live draft PR
+(Lab 3 runbook) and its rollback (Lab 4 runbook), and use
+`docs/post_mvp_backlog.md` Part 2 for résumé / LinkedIn / portfolio.

@@ -12,7 +12,8 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          # Match the local venv and the python:3.14-slim container image.
+          python-version: "3.14"
 
       - name: Install dependencies
         run: |
@@ -27,3 +28,9 @@ jobs:
 
       - name: Run v3 security evaluation suite (deterministic, no API key needed)
         run: python evals/run_v3_evals.py
+
+      - name: Run v4 failure-injection evaluation (challenges the action boundary)
+        run: python evals/run_v4_evals.py
+
+      - name: Check no secret-shaped strings are committed
+        run: python scripts/check_no_secrets.py

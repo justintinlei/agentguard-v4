@@ -1,49 +1,81 @@
-# AgentGuard v3 — MCP Connected Discovery
+# AgentGuard v4 — Governed Remediation MVP
 
-AgentGuard keeps v1's deterministic security scan as the single, unchanged
-source of truth for risk. v3 changes only **where the agent inventory comes
-from**: instead of the UI reading a local JSON file, a read-only MCP (Model
-Context Protocol) 2.x server/client pair discovers the inventory under a fixed
-allowlist, with a SHA-256 provenance hash and an audit trail on every request.
-This is a synthetic training demo — no real systems, accounts, or data are
-involved.
+AgentGuard discovers synthetic AI-agent inventory, scores it with v1's
+deterministic security rules, explains findings with a grounded AI layer, and —
+new in v4 — proposes a **bounded, human-approved, verified, auditable
+remediation** and delivers it only as a **draft pull request** on a dedicated
+synthetic repository. It never gives an AI model arbitrary write access.
 
-## What v3 adds over v2
+It is built for a platform or security team evaluating how to let AI assist with
+AI-agent governance **without** handing a probabilistic model authority over risk
+decisions or production changes. It is a self-contained reference
+implementation: all data is synthetic and no real system, account, or credential
+is touched at any point.
 
-- A **read-only MCP server** (`mcp_server.py`) exposing **exactly five**
-  discovery tools over STDIO: `health_check`, `list_agent_inventory`,
-  `get_agent_by_name`, `list_tool_catalog`, `list_agent_ownership`. There is no
-  create, update, or delete tool.
-- An **independent MCP client** (`mcp_client.py`) that refuses any server whose
-  advertised tool set is not exactly those five.
-- A **strict validation adapter** (`discovery_adapter.py`): every discovered
-  record is checked for field presence, correct type, and documented size limits
-  before it can reach v1's scanner.
-- **Provenance** on every discovery — the SHA-256 of the exact source bytes plus
-  a correlation ID — shown in the UI and written to the audit log.
-- **`app_v3.py`** — a Streamlit page with two discovery paths (a direct in-process
-  "debug" path and the full MCP client/server path), safe traceback-free error
-  messages, and the provenance + risk display.
+## The problem v4 solves
 
-v1's `scanner.py` and v2's grounded analyst (`v2_service.py`) are **unchanged**.
-Only the inventory source and the UI around it are new.
+Visibility and explanation do not fix risk. An enterprise needs a way to propose
+a *narrow* change to a risky agent, have a *named person approve the exact
+reviewed content*, *verify* the change is correct before it is delivered, and
+keep a full *audit and rollback* path — without trusting a probabilistic model to
+decide risk or to touch production.
+
+## The one invariant
+
+Deterministic rules decide **what** to propose. Software verifies whether an
+applied change is correct. A human approves **intent**. The AI layer may explain
+a finding and propose a remediation — it may **never** approve, apply, verify, or
+score. **v1's `scanner.py` remains the sole authority for the risk number**, from
+v1 through v4 unchanged: a proposal *predicts* a score, it never *sets* one.
 
 ## End-to-end flow
 
 ```
-Synthetic connected registry (3 JSON files, connected_environment/)
-  -> read-only MCP server        (STDIO, 5 tools, fixed file allowlist, SHA-256 provenance)
-  -> independent MCP client      (refuses any tool set that isn't exactly the 5)
-  -> validation adapter          (fields, types, size limits; provenance preserved)
-  -> v1 deterministic scanner    [UNCHANGED — the sole risk authority]
-  -> v2 policy retrieval + grounded explanation   [UNCHANGED]
-  -> Streamlit UI + audit log    (now also records the source hash + correlation ID)
+Synthetic connected registry (connected_environment/, 3 JSON files)
+  -> read-only MCP boundary        [v3, UNCHANGED — 5 read-only tools, SHA-256 provenance]
+  -> v1 deterministic scanner      [v1, UNCHANGED — the sole risk authority]
+  -> grounded AI explanation       [v2, UNCHANGED — explains, cites; never scores]
+  -> remediation proposal          one of 3 allowlisted templates; predicts a score
+  -> canonical hash                SHA-256 of the exact source AND the exact proposal
+  -> human approval                APPROVE / REJECT, bound to both hashes
+  -> isolated verification         apply to a throwaway copy, re-scan; HIGH count must not rise
+  -> GitHub plan                   dry-run by default; opt-in live = ONE draft PR, never a merge
+  -> SQLite audit + rollback       every ending recorded; pre-merge rollback = close PR + delete branch
 ```
 
-Full picture and the trust-boundary table: [`docs/v3_architecture.md`](docs/v3_architecture.md).
-Abuse cases and how each is blocked: [`docs/v3_threat_model.md`](docs/v3_threat_model.md).
+The workflow is an explicit state machine
+(`DISCOVERED → SCANNED → PROPOSED → APPROVED → VERIFIED → DRAFT_PR_CREATED →
+ROLLED_BACK`, with `REJECTED` / `FAILED` as fail-closed terminals). Every step
+not on the map is refused. Full map and enforcement:
+[`docs/v4_state_machine.md`](docs/v4_state_machine.md). State-by-state
+*data / authority / gate* table and the six trust boundaries:
+[`docs/v4_architecture.md`](docs/v4_architecture.md). Abuse cases and the test
+that blocks each: [`docs/v4_threat_model.md`](docs/v4_threat_model.md).
 
-## Reproduce the integration
+## The six trust boundaries
+
+Authority to act increases at six points; each is gated by one named,
+deterministic check:
+
+1. **Data boundary** (inherited from v3) — connected inventory becomes
+   scanner-readable only after `discovery_adapter.py` validates fields, types,
+   and size limits.
+2. **Score boundary** — only `scanner.py` ever sets a risk score; a proposal
+   carries a *predicted* score and no AI output may change the real one.
+3. **Approval boundary** (`PROPOSED → APPROVED`) — nothing proceeds without an
+   `ApprovalRecord` bound to the exact proposal hash **and** source hash.
+4. **Verification boundary** (`APPROVED → VERIFIED`) — nothing proceeds without
+   an isolated apply + re-scan in which every check passes; software, not the
+   human, confirms correctness.
+5. **GitHub boundary** (`VERIFIED → DRAFT_PR_CREATED`) — only an approved *and*
+   verified proposal reaches the repo, only within the repo/branch/path
+   allowlist, dry-run by default, draft-only. There is no merge command anywhere
+   in the code.
+6. **Rollback boundary** — automatic reversal is allowed only *before* merge
+   (close PR, delete branch). After a merge the system refuses and requires a
+   reviewed `git revert`.
+
+## Run it
 
 ```bash
 python3 -m venv .venv
@@ -52,65 +84,117 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python scripts/verify_setup.py          # runtime + current MCP 2.x imports
 python scripts/run_release_gate.py       # the full gate — see below
-python scripts/run_mcp_live_smoke.py     # real client <-> real server, once, end to end
-streamlit run app_v3.py                  # the product
+streamlit run app_v4.py                  # the product
 ```
 
 Everything runs in free, deterministic **mock mode** by default — no network
 call, no cost, no API key. Live Claude mode (v2's analyst layer) is optional,
 billed per token, and only ever reads a key from a local, git-ignored `.env`.
 
-Optional protocol-level view:
+Container (only after local acceptance):
 
 ```bash
-npx @modelcontextprotocol/inspector python mcp_server.py
+docker compose up        # app at http://localhost:8501, non-root, mock mode
 ```
 
-Open the **Tools** panel — it lists exactly those five names. Step-by-step in
-[`docs/v3_inspector_walkthrough.md`](docs/v3_inspector_walkthrough.md).
+GitHub live execution is **optional and opt-in**. It targets one private
+synthetic demo repository, creates only a **draft** pull request, and is a
+separate deliberate step — the app itself can never run it. Setup and the exact
+commands: [`docs/v4_github_demo_setup.md`](docs/v4_github_demo_setup.md).
 
-## Reviewed release result
+## Release gate & test report
 
-- 80 labs (Day 1–10), each with a matching Claude Code prompt file in
-  `prompts/course_labs/`.
-- 214 pytest test functions, all passing (`python -m pytest -q`).
-- v2 evaluation: 3 of 3 cases pass.
-- v3 security evaluation: 6 of 6 threat-model categories pass —
-  `python evals/run_v3_evals.py` ends in `V3 SECURITY EVAL SUITE PASS`.
-- Starter-kit validation (including the source-only "exactly five read-only
-  tools" check) and the secret scan both pass.
-- `python scripts/run_release_gate.py` ends in
-  `RELEASE GATE PASS for AgentGuard v3`.
+One command re-proves every layer and prints a single pass line:
 
-## Inherited V2 baseline (verified, frozen)
+```bash
+python scripts/run_release_gate.py
+```
 
-v3 builds on the completed v2 project without changing it. v1's five
-deterministic rules (`AG-001`–`AG-005`) produce a score and a rule ID; v2 adds a
-plain-English explanation tied to real, hashed policy text, with every citation
-checked before it is shown and any model attempt to change the score rejected.
-That pipeline — retrieval, model, grounding validator, UI — can only read,
-explain, check, or display; only v1's scanner ever sets the score. Full v2
-diagram and abuse cases: [`docs/v2_architecture.md`](docs/v2_architecture.md) and
-[`docs/v2_threat_model.md`](docs/v2_threat_model.md). v2 shipped tagged
-`v2.0.0-rc1`.
+It runs, fail-fast, in order:
+
+| Step | Command | Result |
+|---|---|---|
+| Repository scaffolding + prompt-file integrity + "exactly 5 read-only MCP tools" source check | `scripts/validate_starter_kit.py` | `STARTER KIT VALIDATION PASS` |
+| Every v1 + v2 + v3 + v4 unit test | `python -m pytest -q` | **874 passed** |
+| v2 evaluation matrix (forced mock mode) | `evals/run_v2_evals.py` | `V2 EVALUATION PASS: 3 of 3 cases passed` |
+| v3 security evaluation suite | `evals/run_v3_evals.py` | `V3 SECURITY EVAL SUITE PASS` (6 threat-model categories) |
+| v4 failure-injection evaluation | `evals/run_v4_evals.py` | `V4 FAILURE-INJECTION EVAL PASS: 10 of 10 checks held (fails closed)` |
+| Secret scan (`.py` / `.md` / `.yml` / Dockerfile …) | `scripts/check_no_secrets.py` | `SECRET CHECK PASS` |
+
+The run ends `RELEASE GATE PASS for AgentGuard v4`. `python -m compileall -q .`
+is clean. CI (`.github/workflows/tests.yml`) runs the same unit tests plus the
+v2/v3/v4 evals and the secret scan on every push, on Python 3.14.
+
+The v4 eval is the security proof: each of its 10 checks *injects* a bad input —
+a skipped workflow state, a rollback of an already-merged PR, a risk-raising
+remediation, a drifted approval, a broken `gh` command, an unapproved
+repository — and passes only if v4 **refuses** it. Two positive controls confirm
+a valid remediation still verifies and still reaches a five-command plan, so
+"fails closed" is not "broken closed".
+
+Reproduce every claim yourself: [`evidence/README.md`](evidence/README.md).
+
+## Inherited v2 / v3 baseline (verified, frozen)
+
+v4 builds on the completed v2 and v3 projects without changing their behavior.
+
+- **v1** — five deterministic rules (`AG-001`–`AG-005`) produce a score and a
+  rule ID from a local JSON inventory. Unchanged.
+- **v2** — a grounded Claude explanation layer: it retrieves real policy text,
+  asks the model (or a free deterministic mock) for a structured explanation
+  with citations, and validates every citation and the reported score before
+  anything is shown. Explains and cites; never sets the score. Complete and
+  frozen. See [`docs/v2_architecture.md`](docs/v2_architecture.md) and
+  [`docs/v2_threat_model.md`](docs/v2_threat_model.md).
+- **v3** — a read-only MCP (Model Context Protocol) 2.x server/client pair
+  (`mcp_server.py` / `mcp_client.py`) that discovers the inventory over STDIO
+  under a fixed allowlist, exposing **exactly five** tools (`health_check`,
+  `list_agent_inventory`, `get_agent_by_name`, `list_tool_catalog`,
+  `list_agent_ownership`) — no create, update, or delete tool. The client
+  refuses any server whose tool set is not exactly those five. Ended
+  `RELEASE GATE PASS for AgentGuard v3`. See
+  [`docs/v3_architecture.md`](docs/v3_architecture.md) and
+  [`docs/v3_threat_model.md`](docs/v3_threat_model.md).
+
+**v4 adds no sixth, write-capable MCP tool.** The remediation workflow is a
+separate governed component so v3's server stays provably read-only forever. The
+reasoning: [`docs/v3_to_v4_handoff.md`](docs/v3_to_v4_handoff.md).
+
+## Limitations
+
+Stated openly; full detail in
+[`docs/v4_threat_model.md`](docs/v4_threat_model.md) ("Accepted residual risks"):
+
+- Synthetic data, local demo — not a production deployment, and not complete
+  enterprise agent discovery.
+- The Streamlit page's event timeline is in-memory; the durable SQLite audit
+  trail is exercised by the tests and evals directly, and wiring it into the UI
+  is a post-MVP item.
+- Approval is a single free-text reviewer — no identity check, no RBAC, no
+  separation of duties.
+- No production auth/authz, multi-tenancy, high availability, or compliance
+  certification. See [`docs/post_mvp_backlog.md`](docs/post_mvp_backlog.md).
 
 ## Learn more
 
-- [`START_HERE.md`](START_HERE.md) — course navigation and how to re-verify the build
-- [`docs/lab_execution_index.md`](docs/lab_execution_index.md) — the authoritative map of every lab
-- [`docs/v3_architecture.md`](docs/v3_architecture.md) — trust boundaries, data flow, and a box-by-box reproduce guide
-- [`docs/v3_threat_model.md`](docs/v3_threat_model.md) — the seven abuse categories and their tests, plus accepted residual risks
-- [`docs/v3_data_contract.md`](docs/v3_data_contract.md) — the exact shape and size limits a connected registry must supply
-- [`docs/v3_mcp_setup.md`](docs/v3_mcp_setup.md) — Python + Node environment for MCP
-- [`docs/v3_inspector_walkthrough.md`](docs/v3_inspector_walkthrough.md) — driving the MCP Inspector
-- [`docs/v3_interview_brief.md`](docs/v3_interview_brief.md) — eight likely interview questions answered from the real code
+- [`START_HERE.md`](START_HERE.md) — how to verify and demo the build in five minutes
+- [`docs/v4_architecture.md`](docs/v4_architecture.md) — state-by-state authority table and the six trust boundaries
+- [`docs/v4_state_machine.md`](docs/v4_state_machine.md) — the transition map, its enforcement, and the audit log
+- [`docs/v4_threat_model.md`](docs/v4_threat_model.md) — the abuse categories, the control for each, and the test that proves it
+- [`docs/v4_github_demo_setup.md`](docs/v4_github_demo_setup.md) — the private synthetic demo repo, the allowlist, and the optional draft-PR run
+- [`docs/final_mvp_interview_brief.md`](docs/final_mvp_interview_brief.md) — eleven design questions answered from the real code
+- [`docs/post_mvp_backlog.md`](docs/post_mvp_backlog.md) — what a next version would build, and why each item is outside the MVP
 - [`docs/v3_to_v4_handoff.md`](docs/v3_to_v4_handoff.md) — why v4 governs writes through proposals + approval instead of a write tool
-- [`evidence/README.md`](evidence/README.md) — how to verify and save proof of each claim above yourself
+- [`evidence/README.md`](evidence/README.md) — reproduce and save proof of every claim yourself
 - [`docs/roadmap.md`](docs/roadmap.md) — the full v1–v4 plan
+- [`docs/lab_execution_index.md`](docs/lab_execution_index.md) — the full build log: the ~80 incremental, individually tested steps this was built in
+- `CLAUDE.md` — the standing safety boundaries for working in this repo
 
 ## Safety boundaries
 
-See `CLAUDE.md` for the full list. In short: everything here runs locally, no
-real credentials or accounts are involved, the MCP discovery server is read-only
-and exposes exactly five tools, and only v1's deterministic rules ever set a risk
-score — the AI layer explains and cites, never decides.
+Everything runs locally on synthetic data; no real credentials or accounts are
+involved. The MCP discovery server is read-only and exposes exactly five tools.
+Only v1's deterministic rules ever set a risk score — the AI layer explains and
+cites, never decides. GitHub work is dry-run by default, draft-only, on a
+dedicated synthetic repo, and there is no merge command anywhere in the code.
+Full list: `CLAUDE.md`.

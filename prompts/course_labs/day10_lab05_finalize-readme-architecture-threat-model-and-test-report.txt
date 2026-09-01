@@ -1,6 +1,6 @@
 I am a beginner completing AgentGuard v4, Day 10, Lab 5: Finalize README Architecture Threat Model And Test Report.
 
-Read `CLAUDE.md`, `docs/lab_execution_index.md`, and the current repository before changing anything. Stay inside `~/Developer/agentguard-v4`.
+Read `CLAUDE.md`, `docs/lab_execution_index.md`, and the current repository before changing anything. Stay inside `~/Developer/AgentGuard/01-Working/agentguard-v4`.
 
 ## Learning goal
 how documentation turns code into an enterprise product case study
@@ -37,7 +37,7 @@ If the lab requires a missing file, create it at the exact path above. Do not in
 
 ## Verification commands
 After implementation, run these one at a time and explain each result:
-1. `cd ~/Developer/agentguard-v4`
+1. `cd ~/Developer/AgentGuard/01-Working/agentguard-v4`
 2. `source .venv/bin/activate`
 3. `git status --short`
 

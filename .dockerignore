@@ -1,0 +1,38 @@
+# Anything listed here is NOT copied into the image by `COPY . .` in the
+# Dockerfile. Keeps the build context small and secret-free.
+
+# Version control history + the host Python environment
+.git
+.venv
+
+# Python caches
+__pycache__
+*.pyc
+.pytest_cache
+
+# Secrets and local runtime data - must never be baked into an image
+.env
+.env.*
+*.db
+*.jsonl
+
+# Dev / CI tooling - a runtime image ships the app, not the test suite
+# (Day 9 Lab 7: building the image showed it was carrying tests/, and
+# tests/test_docs_consistency.py needs evidence/ + docs/ that a runtime
+# image correctly does not include). The full suite runs on the host and
+# in CI against the checked-out source, not inside the image.
+tests/
+evals/
+
+# Not needed to run the service
+evidence/
+notes/
+prompts/
+.claude/
+.plans/
+.DS_Store
+
+# Build config itself - not needed inside the running image
+Dockerfile
+.dockerignore
+compose.yaml
