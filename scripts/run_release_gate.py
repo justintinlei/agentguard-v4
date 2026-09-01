@@ -1,12 +1,13 @@
-"""Run every gate that must pass before AgentGuard v3 ships, in one command.
+"""Run every gate that must pass before AgentGuard v4 ships, in one command.
 
 One script, one answer. It runs, in order:
 
   1. scripts/validate_starter_kit.py - the course scaffolding is intact
-  2. python -m pytest -q            - every v1, v2, and v3 unit test
+  2. python -m pytest -q            - every v1, v2, v3, and v4 unit test
   3. evals/run_v2_evals.py          - v2's evaluation matrix (forced mock mode)
   4. evals/run_v3_evals.py          - v3's security evaluation suite
-  5. scripts/check_no_secrets.py    - no key-shaped strings in any text file
+  5. evals/run_v4_evals.py          - v4's failure-injection eval (proves v4 fails closed)
+  6. scripts/check_no_secrets.py    - no key-shaped strings in any text file
 
 Fail-fast: the first step to exit non-zero stops the run with that step's
 exit code. There is no partial pass - the final line only prints if every
@@ -22,10 +23,11 @@ COMMANDS = [
     "python -m pytest -q",
     "python evals/run_v2_evals.py",
     "python evals/run_v3_evals.py",
+    "python evals/run_v4_evals.py",
     "python scripts/check_no_secrets.py",
 ]
 
-PASS_MESSAGE = "RELEASE GATE PASS for AgentGuard v3"
+PASS_MESSAGE = "RELEASE GATE PASS for AgentGuard v4"
 
 
 def main() -> None:

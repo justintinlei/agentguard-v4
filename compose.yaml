@@ -1,0 +1,23 @@
+# `docker compose up` builds ./Dockerfile and runs the v4 app as a local
+# service at http://localhost:8501. One service, no database container,
+# and no secret in this file.
+
+services:
+  agentguard:
+    build: .
+    ports:
+      - "8501:8501"          # host:container - reach the app at localhost:8501
+    environment:
+      # "mock" = deterministic, no billed Claude API call, no network.
+      # This is v2_service.py's default anyway; pinned here so the
+      # container is explicitly the safe mode. No ANTHROPIC_API_KEY and no
+      # env_file: a live run would be a deliberate runtime
+      # `-e ANTHROPIC_API_KEY=...`, never baked in.
+      AGENTGUARD_MODE: mock
+    volumes:
+      # Named volume for the Day 10 SQLite audit log (/app/data/audit.db).
+      # It survives `docker compose down` and image rebuilds.
+      - agentguard-data:/app/data
+
+volumes:
+  agentguard-data:

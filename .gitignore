@@ -8,6 +8,11 @@ __pycache__/
 .env.*
 !.env.example
 *.jsonl
+*.db
+# v2 audit log is *.jsonl; v4 SQLite audit database is *.db - never commit either
 evidence/*.png
 evidence/*.pdf
 .claude/
+# .agentguard/pr_body.md is a transient PR description rendered just before
+# a live draft PR (github_plan.write_pr_body); never commit the generated body
+.agentguard/
